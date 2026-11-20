@@ -1,0 +1,52 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.dependencies import get_current_user
+from app.database import get_db
+from app.models import User
+from app.schemas.absence import AbsenceCreate, AbsenceRead
+from app.schemas.suggestion import SuggestionRead
+from app.services.absence import (
+    AbsenceConflict,
+    AbsenceNotFound,
+    AbsenceSelectionError,
+    mark_absence,
+)
+from app.services.suggestion import suggest_candidates
+
+
+router = APIRouter()
+
+
+@router.post("/absences", response_model=list[AbsenceRead])
+def create_absences(
+    payload: AbsenceCreate,
+    faculty: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> list[AbsenceRead]:
+    try:
+        absences = mark_absence(
+            session,
+            faculty,
+            payload.date,
+            payload.periods,
+            payload.reason,
+        )
+    except AbsenceSelectionError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except AbsenceConflict as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return [AbsenceRead.model_validate(absence) for absence in absences]
+
+
+@router.get("/absences/{absence_id}/suggestions", response_model=list[SuggestionRead])
+def read_suggestions(
+    absence_id: int,
+    _: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> list[SuggestionRead]:
+    try:
+        suggestions = suggest_candidates(session, absence_id)
+    except AbsenceNotFound as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    return [SuggestionRead.model_validate(suggestion.__dict__) for suggestion in suggestions]
