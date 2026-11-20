@@ -17,6 +17,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default=UserRole.FACULTY.value, nullable=False)
     department = Column(String(120), nullable=False)
+    employee_id = Column(String(50), unique=True, index=True, nullable=True)
+    designation = Column(String(100), nullable=True)
     phone = Column(String(30), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

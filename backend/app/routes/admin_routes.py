@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, extract
 from datetime import date, datetime
 from typing import Optional
 
@@ -78,6 +78,33 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
      .filter(User.role == UserRole.FACULTY.value)\
      .group_by(User.id).order_by(func.count(Substitution.id).desc()).limit(8).all()
 
+    # 7. Monthly substitution trends (actual DB records past 6 months)
+    monthly_trend = []
+    month_abbrs = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    for i in range(5, -1, -1):
+        m = today.month - i
+        y = today.year
+        if m <= 0:
+            m += 12
+            y -= 1
+        sub_cnt = db.query(Substitution).join(Absence).filter(
+            extract("year", Absence.date) == y,
+            extract("month", Absence.date) == m,
+            Substitution.status.in_([SubstitutionStatus.ACCEPTED.value, SubstitutionStatus.COMPLETED.value])
+        ).count()
+        abs_cnt = db.query(Absence).filter(
+            extract("year", Absence.date) == y,
+            extract("month", Absence.date) == m
+        ).count()
+        monthly_trend.append({
+            "label": f"{month_abbrs[m - 1]}",
+            "sub_count": sub_cnt,
+            "abs_count": abs_cnt
+        })
+
+    # 8. Notifications
+    admin_notifs = db.query(Notification).filter(Notification.user_id == user.id).order_by(Notification.created_at.desc()).limit(5).all()
+
     ctx = get_admin_context(request, user, db, "dashboard")
     ctx.update({
         "total_faculty": total_faculty,
@@ -93,6 +120,8 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "pending_subs": pending_subs,
         "recent_completed_subs": recent_completed_subs,
         "faculty_workloads": faculty_workloads,
+        "monthly_trend": monthly_trend,
+        "admin_notifs": admin_notifs,
         "day_name": day_name
     })
     return templates.TemplateResponse(request, "admin/dashboard.html", ctx)

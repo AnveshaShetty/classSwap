@@ -1,7 +1,9 @@
 import pytest
-from datetime import date
+from datetime import date, timedelta
 from fastapi.testclient import TestClient
 from backend.app.main import app
+from backend.app.database import SessionLocal
+from backend.app.models.substitution import Absence, Substitution, DateOverride
 
 client = TestClient(app)
 
@@ -36,6 +38,11 @@ def test_full_16_step_demonstration_workflow():
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
     print("--- STEP 2: Open Timetable ---")
+    today = date.today()
+    days_ahead = (1 - today.weekday()) % 7  # 1 is Tuesday
+    tuesday_date = today + timedelta(days=days_ahead)
+    target_date = tuesday_date.strftime("%Y-%m-%d")
+
     tt_res = client.get("/api/timetable?day_of_week=Tuesday&period_no=3", headers=admin_headers)
     assert tt_res.status_code == 200
     tt_entries = tt_res.json()
@@ -43,24 +50,26 @@ def test_full_16_step_demonstration_workflow():
     # On Tuesday Period 3, Dr. Rajesh Kumar teaches Data Structures in LH-101
     target_class = tt_entries[0]
     target_faculty_id = target_class["faculty_id"]
-    target_date = date.today().strftime("%Y-%m-%d")
 
     print(f"--- STEP 3 & 4: Mark Faculty Absent for 3rd Period (Faculty ID: {target_faculty_id}) ---")
-    # First delete any existing absence on this slot if previously tested
+    # Clean up any leftover test data for target_date and period 3
+    db = SessionLocal()
+    existing_abs = db.query(Absence).filter(Absence.date == tuesday_date, Absence.period_no == 3).all()
+    for ab in existing_abs:
+        db.query(DateOverride).filter(DateOverride.date == tuesday_date, DateOverride.period_no == 3).delete()
+        db.query(Substitution).filter(Substitution.absence_id == ab.id).delete()
+        db.delete(ab)
+    db.commit()
+    db.close()
+
     absence_res = client.post("/api/absences", json={
         "faculty_id": target_faculty_id,
         "date": target_date,
         "period_nos": [3],
         "reason": "Attending University Academic Council Meeting"
     }, headers=admin_headers)
-    
-    # If duplicate from earlier run, fetch existing
-    if absence_res.status_code == 400:
-        abs_list = client.get(f"/api/absences?date_filter={target_date}&faculty_id={target_faculty_id}", headers=admin_headers).json()
-        absence_id = abs_list[0]["id"]
-    else:
-        assert absence_res.status_code == 200
-        absence_id = absence_res.json()[0]["id"]
+    assert absence_res.status_code == 200
+    absence_id = absence_res.json()[0]["id"]
 
     print("--- STEP 5, 6, 7: Display Top 3 Substitutes & Free Rooms ---")
     rec_res = client.get(f"/api/absences/{absence_id}/recommendations", headers=admin_headers)

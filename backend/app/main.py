@@ -94,6 +94,19 @@ def login_page(request: Request, error: str = None, msg: str = None, db: Session
         "college_name": settings.COLLEGE_NAME
     })
 
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request, db: Session = Depends(get_db)):
+    """Faculty Registration Page."""
+    current_user = get_current_user_optional(request, db=db)
+    if current_user:
+        if current_user.role == UserRole.ADMIN.value:
+            return RedirectResponse(url="/admin/dashboard", status_code=303)
+        return RedirectResponse(url="/faculty/dashboard", status_code=303)
+    return templates.TemplateResponse(request, "register.html", {
+        "request": request,
+        "college_name": settings.COLLEGE_NAME
+    })
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "app": settings.PROJECT_NAME, "version": settings.VERSION}

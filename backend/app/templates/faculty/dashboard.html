@@ -50,6 +50,29 @@
         </div>
     </div>
 
+    <!-- WORKLOAD FAIRNESS PROGRESS INDICATOR -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <div>
+                <h3 class="text-sm font-bold text-navy-900 flex items-center">
+                    <i data-lucide="scale" class="w-4 h-4 mr-1.5 text-tealAccent-600"></i>
+                    Monthly Workload &amp; Fairness Distribution
+                </h3>
+                <p class="text-xs text-slate-500">College equitable distribution guideline: maximum 4 substitution duties per month</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-brand-600">{{ monthly_subs_count }} / 4 Duties</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {% if monthly_subs_count >= 4 %}bg-red-100 text-red-800{% elif monthly_subs_count >= 2 %}bg-blue-100 text-blue-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                    {% if monthly_subs_count >= 4 %}Cap Reached{% elif monthly_subs_count >= 2 %}Balanced{% else %}Eligible for Priority{% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+            {% set pct = (monthly_subs_count / 4 * 100)|int if (monthly_subs_count / 4 * 100)|int <= 100 else 100 %}
+            <div class="h-full rounded-full transition-all duration-500 {% if pct >= 100 %}bg-red-500{% elif pct >= 50 %}bg-brand-600{% else %}bg-tealAccent-500{% endif %}" style="width: {{ pct }}%"></div>
+        </div>
+    </div>
+
     <!-- PENDING SUBSTITUTION REQUESTS (CALL TO ACTION) -->
     {% if pending_requests %}
     <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 shadow-sm">
@@ -156,10 +179,15 @@
     </div>
 
     <!-- WEEKLY TIMETABLE GRID -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="p-5 border-b border-slate-200">
-            <h3 class="font-bold text-navy-900 text-base">Your Weekly Master Timetable</h3>
-            <p class="text-xs text-slate-500">Regular recurring teaching assignments</p>
+    <div id="timetable" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden scroll-mt-20">
+        <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+                <h3 class="font-bold text-navy-900 text-base">Your Weekly Master Timetable</h3>
+                <p class="text-xs text-slate-500">Regular recurring teaching assignments</p>
+            </div>
+            <a href="/faculty/mark-absence" class="text-xs font-semibold text-brand-600 hover:text-brand-700">
+                Need Leave? Mark Absence &rarr;
+            </a>
         </div>
 
         <div class="overflow-x-auto">
@@ -203,6 +231,31 @@
             </table>
         </div>
     </div>
+
+    <!-- NOTIFICATIONS & ACTIVITY -->
+    {% if recent_notifs %}
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-navy-900 text-sm flex items-center">
+                <i data-lucide="bell" class="w-4 h-4 mr-2 text-brand-600"></i>
+                Recent Notifications &amp; Substitution Alerts
+            </h3>
+            <span class="text-xs text-slate-400">{{ recent_notifs|length }} Notifications</span>
+        </div>
+        <div class="space-y-2.5">
+            {% for n in recent_notifs %}
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-start space-x-3">
+                <div class="w-2 h-2 rounded-full bg-brand-500 mt-1.5 flex-shrink-0"></div>
+                <div>
+                    <p class="text-xs font-bold text-navy-900">{{ n.title }}</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">{{ n.message }}</p>
+                    <span class="text-[10px] text-slate-400 mt-1 inline-block">{{ n.created_at.strftime('%A, %b %d at %H:%M') if n.created_at else '' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

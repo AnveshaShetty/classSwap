@@ -19,11 +19,11 @@ if __name__ == "__main__":
     print("   Faculty:     priya.nair@classswap.edu   | Password: Faculty@123")
     print("=" * 70)
 
-    use_reload = os.getenv("RELOAD", "false").lower() in ("true", "1", "yes")
+    use_reload = os.getenv("RELOAD", "true").lower() in ("true", "1", "yes")
 
     uvicorn.run(
         "backend.app.main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8000,
         reload=use_reload
     )

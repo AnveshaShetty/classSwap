@@ -10,22 +10,29 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 
 def get_token_from_request(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> Optional[str]:
     """Retrieve JWT token from Authorization header or 'access_token' cookie."""
-    if token:
+    if token and isinstance(token, str):
         return token
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        auth_clean = auth_header.strip()
+        if auth_clean.startswith("Bearer "):
+            return auth_clean.split(" ", 1)[1].strip()
+        return auth_clean
     cookie_token = request.cookies.get("access_token")
     if cookie_token:
-        # Strip potential Bearer prefix if stored
-        if cookie_token.startswith("Bearer "):
-            return cookie_token.split(" ", 1)[1]
-        return cookie_token
+        # Strip potential surrounding quotes and Bearer prefix
+        clean_token = cookie_token.strip('"').strip("'").strip()
+        if clean_token.startswith("Bearer "):
+            clean_token = clean_token.split(" ", 1)[1].strip()
+        return clean_token
     return None
 
 def get_current_user_optional(
     request: Request,
-    token: Optional[str] = Depends(get_token_from_request),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
     """Return User if token is valid, else None without raising 401."""
+    token = get_token_from_request(request)
     if not token:
         return None
     payload = decode_access_token(token)
@@ -41,7 +48,6 @@ def get_current_user_optional(
 
 def get_current_user(
     request: Request,
-    token: Optional[str] = Depends(get_token_from_request),
     db: Session = Depends(get_db)
 ) -> User:
     """Enforce authentication; raise 401 if unauthorized."""
@@ -50,17 +56,9 @@ def get_current_user(
         detail="Could not validate credentials or session expired.",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not token:
+    user = get_current_user_optional(request, db=db)
+    if not user:
         raise credentials_exception
-    payload = decode_access_token(token)
-    if not payload:
-        raise credentials_exception
-    user_id = payload.get("sub")
-    if not user_id:
-        raise credentials_exception
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive or non-existent user.")
     return user
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:

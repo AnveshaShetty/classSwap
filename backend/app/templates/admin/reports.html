@@ -65,6 +65,37 @@
         </div>
     </div>
 
+    <!-- VISUAL ANALYTICS CHARTS (Chart.js) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Chart 1: Department Recovery vs Absences -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-navy-900 text-sm">Department-wise Recovery vs. Absences</h3>
+                    <p class="text-[11px] text-slate-500">Comparison of reported absences and covered substitutions</p>
+                </div>
+                <span class="text-[10px] font-bold text-tealAccent-700 bg-teal-50 px-2.5 py-1 rounded-full">Recovery Rate</span>
+            </div>
+            <div class="h-64">
+                <canvas id="deptChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 2: Top Faculty Substitution Distribution -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-navy-900 text-sm">Faculty Workload Comparison</h3>
+                    <p class="text-[11px] text-slate-500">Classes covered by top contributors (Fairness tracking)</p>
+                </div>
+                <span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-full">Fairness</span>
+            </div>
+            <div class="h-64">
+                <canvas id="facultyWorkloadChart"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- DEPARTMENTAL BREAKDOWN -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="p-5 border-b border-slate-200">
@@ -139,4 +170,99 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Department Chart
+        const deptCtx = document.getElementById('deptChart');
+        if (deptCtx) {
+            const deptLabels = [{% for d in report.department_stats %}'{{ d.department.split(" ")[0] }}',{% endfor %}];
+            const absencesData = [{% for d in report.department_stats %}{{ d.total_absences }},{% endfor %}];
+            const recoveredData = [{% for d in report.department_stats %}{{ d.substitutions_completed }},{% endfor %}];
+
+            new Chart(deptCtx, {
+                type: 'bar',
+                data: {
+                    labels: deptLabels,
+                    datasets: [
+                        {
+                            label: 'Absences',
+                            data: absencesData,
+                            backgroundColor: '#f87171',
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Covered / Recovered',
+                            data: recoveredData,
+                            backgroundColor: '#0d9488',
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Plus Jakarta Sans', size: 10 } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 10 } },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: {
+                            ticks: { color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 10 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Faculty Workload Comparison Chart
+        const facCtx = document.getElementById('facultyWorkloadChart');
+        if (facCtx) {
+            const topFaculty = [
+                {% for f in report.faculty_workload[:8] %}
+                { name: '{{ f.faculty_name.split(" ")[-1] }}', count: {{ f.substitutions_completed }} },
+                {% endfor %}
+            ];
+
+            new Chart(facCtx, {
+                type: 'bar',
+                data: {
+                    labels: topFaculty.map(f => f.name),
+                    datasets: [{
+                        label: 'Substitutions Completed',
+                        data: topFaculty.map(f => f.count),
+                        backgroundColor: '#2563eb',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 10 } },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        y: {
+                            ticks: { color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 10 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

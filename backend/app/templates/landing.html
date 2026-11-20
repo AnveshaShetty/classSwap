@@ -1,298 +1,420 @@
 {% extends "base.html" %}
 
-{% block title %}ClassSwap — Smart Substitutions. Zero Idle Hours.{% endblock %}
+{% block title %}ClassSwap — Smarter Timetables. Seamless Substitutions.{% endblock %}
 
 {% block public_content %}
-<!-- HERO SECTION -->
-<section class="relative overflow-hidden bg-gradient-to-b from-navy-950 via-navy-900 to-slate-900 text-white pt-20 pb-24 lg:pt-28 lg:pb-32">
-    <!-- Background grid decoration -->
-    <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
 
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <!-- Badge -->
-        <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs font-semibold text-tealAccent-400 mb-6 backdrop-blur-sm shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-tealAccent-500 animate-pulse"></span>
-            <span>Intelligent Academic Timetable & Faculty Substitution System</span>
-        </div>
+<!-- ═══════════════════════════════════════════════════════════
+     HERO SECTION
+════════════════════════════════════════════════════════════ -->
+<section class="relative overflow-hidden bg-white pt-10 pb-20 lg:pt-16 lg:pb-28">
+    <!-- Background blobs -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute top-0 right-0 w-96 h-96 bg-brand-50 rounded-full -translate-y-1/3 translate-x-1/3 blur-3xl opacity-70"></div>
+        <div class="absolute bottom-0 left-0 w-72 h-72 bg-teal-50 rounded-full translate-y-1/3 -translate-x-1/3 blur-3xl opacity-70"></div>
+    </div>
 
-        <!-- Headline -->
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-tight">
-            Smart Substitutions. <br class="hidden sm:inline" />
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-brand-500 to-tealAccent-400">Zero Idle Hours.</span>
-        </h1>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
-        <!-- One-line pitch -->
-        <p class="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            When a faculty member is absent, ClassSwap calculates an optimal substitute and matches a free classroom in seconds — powered by a multi-factor fairness algorithm.
-        </p>
+            <!-- LEFT: Headline + CTA -->
+            <div>
+                <!-- Badge -->
+                <div class="inline-flex items-center space-x-2 bg-brand-50 border border-brand-200 rounded-full px-4 py-1.5 mb-6">
+                    <span class="w-2 h-2 bg-tealAccent-500 rounded-full animate-pulse"></span>
+                    <span class="text-xs font-bold text-brand-700 tracking-wide uppercase">Intelligent College Platform</span>
+                </div>
 
-        <!-- CTA Action Buttons -->
-        <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="/login" class="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-xl text-base font-semibold text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-600/30 transition-all hover:scale-105">
-                <i data-lucide="play" class="w-4 h-4 mr-2"></i> Launch Live Demo
-            </a>
-            <a href="#how-it-works" class="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-xl text-base font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition-all">
-                <i data-lucide="info" class="w-4 h-4 mr-2"></i> How It Works
-            </a>
-        </div>
+                <h1 class="text-4xl sm:text-5xl lg:text-5xl font-extrabold text-navy-900 leading-tight tracking-tight">
+                    Smarter Timetables.<br>
+                    <span class="text-brand-600">Seamless</span> Substitutions.
+                </h1>
 
-        <!-- Quick Demo Switch Bar -->
-        <div class="mt-12 p-4 bg-navy-900/80 backdrop-blur-md rounded-2xl border border-slate-800 max-w-3xl mx-auto text-left shadow-2xl">
-            <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center">
-                    <i data-lucide="zap" class="w-3.5 h-3.5 mr-1.5 text-amber-400"></i> Instant 1-Click Persona Access
-                </span>
-                <span class="text-[11px] text-slate-500">No registration needed</span>
+                <p class="mt-5 text-lg text-slate-500 leading-relaxed max-w-lg">
+                    Automate faculty substitution and find free rooms with intelligent matching. Zero idle hours, zero manual coordination.
+                </p>
+
+                <!-- CTA Buttons -->
+                <div class="mt-8 flex flex-wrap gap-4">
+                    <a href="/register" class="inline-flex items-center px-6 py-3.5 rounded-xl text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-500/25 transition-all hover:-translate-y-0.5">
+                        <i data-lucide="user-plus" class="w-4 h-4 mr-2"></i>
+                        Get Started Free
+                    </a>
+                    <a href="/login" class="inline-flex items-center px-6 py-3.5 rounded-xl text-sm font-bold text-navy-900 bg-white border border-slate-200 hover:border-brand-300 hover:bg-brand-50 shadow-sm transition-all hover:-translate-y-0.5">
+                        <i data-lucide="log-in" class="w-4 h-4 mr-2 text-brand-600"></i>
+                        Sign In
+                    </a>
+                </div>
+
+                <!-- Trust badges -->
+                <div class="mt-8 flex items-center space-x-6 text-xs text-slate-400">
+                    <span class="flex items-center space-x-1.5"><i data-lucide="shield-check" class="w-4 h-4 text-tealAccent-500"></i><span>JWT Secured</span></span>
+                    <span class="flex items-center space-x-1.5"><i data-lucide="zap" class="w-4 h-4 text-amber-500"></i><span>Real-time Alerts</span></span>
+                    <span class="flex items-center space-x-1.5"><i data-lucide="file-down" class="w-4 h-4 text-brand-500"></i><span>PDF Reports</span></span>
+                </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <button onclick="quickSwitchLogin('admin@classswap.edu', 'Admin@123')" class="p-3 rounded-xl bg-slate-800/90 hover:bg-brand-900/40 border border-slate-700 hover:border-brand-500 text-left transition-all group">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-white group-hover:text-brand-400">HOD / Admin</span>
-                        <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-brand-400"></i>
+
+            <!-- RIGHT: Dashboard Preview Visual -->
+            <div class="relative">
+                <!-- Outer shadow frame -->
+                <div class="relative bg-white rounded-2xl shadow-2xl shadow-slate-200/80 border border-slate-100 overflow-hidden">
+                    <!-- Fake topbar -->
+                    <div class="bg-navy-900 px-5 py-3 flex items-center space-x-2.5">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+                        <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                        <span class="ml-3 text-xs text-slate-400 font-mono">classswap.edu/admin/dashboard</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Dr. Arvind Swaminathan</p>
-                </button>
-                <button onclick="quickSwitchLogin('rajesh.kumar@classswap.edu', 'Faculty@123')" class="p-3 rounded-xl bg-slate-800/90 hover:bg-tealAccent-900/40 border border-slate-700 hover:border-tealAccent-500 text-left transition-all group">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-white group-hover:text-tealAccent-400">Absent Faculty</span>
-                        <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-tealAccent-400"></i>
+                    <!-- Fake dashboard body -->
+                    <div class="flex">
+                        <!-- Fake sidebar -->
+                        <div class="w-14 bg-navy-900 flex flex-col items-center py-4 space-y-4">
+                            <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center"><i data-lucide="layout-dashboard" class="w-4 h-4 text-white"></i></div>
+                            <div class="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center"><i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i></div>
+                            <div class="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center"><i data-lucide="users" class="w-4 h-4 text-slate-400"></i></div>
+                            <div class="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center"><i data-lucide="user-x" class="w-4 h-4 text-slate-400"></i></div>
+                            <div class="w-8 h-8 bg-tealAccent-600 rounded-lg flex items-center justify-center"><i data-lucide="door-open" class="w-4 h-4 text-white"></i></div>
+                        </div>
+                        <!-- Fake content area -->
+                        <div class="flex-1 bg-slate-50 p-4 space-y-3">
+                            <!-- Mini KPI cards -->
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase">Faculty</p>
+                                    <p class="text-lg font-extrabold text-navy-900">{{ total_faculty }}</p>
+                                </div>
+                                <div class="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase">Sections</p>
+                                    <p class="text-lg font-extrabold text-navy-900">{{ total_sections }}</p>
+                                </div>
+                                <div class="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase">Rooms</p>
+                                    <p class="text-lg font-extrabold text-navy-900">{{ total_rooms }}</p>
+                                </div>
+                                <div class="bg-white rounded-xl p-3 border border-tealAccent-100 bg-teal-50 shadow-sm">
+                                    <p class="text-[9px] font-bold text-tealAccent-600 uppercase">Hrs Saved</p>
+                                    <p class="text-lg font-extrabold text-tealAccent-700">{{ idle_hours_saved }}</p>
+                                </div>
+                            </div>
+                            <!-- Fake timetable grid -->
+                            <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                                <p class="text-[10px] font-bold text-slate-500 mb-2 uppercase">Today's Schedule</p>
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-[9px] text-slate-400 w-10">P1 • 9AM</span>
+                                        <div class="flex-1 h-6 bg-blue-100 rounded flex items-center px-2"><span class="text-[9px] font-semibold text-blue-800">Database Management</span></div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-[9px] text-slate-400 w-10">P2 • 10AM</span>
+                                        <div class="flex-1 h-6 bg-purple-100 rounded flex items-center px-2"><span class="text-[9px] font-semibold text-purple-800">Data Structures</span></div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-[9px] text-slate-400 w-10">P3 • 11AM</span>
+                                        <div class="flex-1 h-6 bg-amber-100 rounded flex items-center px-2 justify-between">
+                                            <span class="text-[9px] font-semibold text-amber-800">OS — Absent ⚠</span>
+                                            <span class="text-[8px] bg-emerald-200 text-emerald-800 px-1.5 rounded font-bold">Sub Found</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-[9px] text-slate-400 w-10">P4 • 12PM</span>
+                                        <div class="flex-1 h-6 bg-teal-100 rounded flex items-center px-2"><span class="text-[9px] font-semibold text-teal-800">Computer Networks</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Dr. Rajesh Kumar (DS)</p>
-                </button>
-                <button onclick="quickSwitchLogin('priya.nair@classswap.edu', 'Faculty@123')" class="p-3 rounded-xl bg-slate-800/90 hover:bg-emerald-900/40 border border-slate-700 hover:border-emerald-500 text-left transition-all group">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-white group-hover:text-emerald-400">Top Substitute</span>
-                        <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400"></i>
+                </div>
+                <!-- Floating badge -->
+                <div class="absolute -bottom-5 -left-5 bg-white rounded-2xl shadow-xl p-3 border border-slate-100 flex items-center space-x-3 z-20">
+                    <div class="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-600"></i>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Dr. Priya Nair (Rank 1)</p>
-                </button>
+                    <div>
+                        <p class="text-xs font-bold text-navy-900">{{ completed_subs }} Classes Recovered</p>
+                        <p class="text-[10px] text-slate-400">via smart substitution</p>
+                    </div>
+                </div>
+                <!-- AI badge -->
+                <div class="absolute -top-4 -right-4 bg-brand-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg">
+                    AI Powered ✦
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- LIVE DEMO METRICS STRIP -->
-<section class="bg-white border-y border-slate-200 py-10">
+<!-- ═══════════════════════════════════════════════════════════
+     STATS BAR
+════════════════════════════════════════════════════════════ -->
+<section class="bg-navy-900 py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
-            <div class="p-3">
-                <p class="text-3xl font-extrabold text-navy-900">{{ total_faculty }}</p>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Faculty Members</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+                <p class="text-3xl font-extrabold text-white">{{ total_faculty }}<span class="text-brand-400">+</span></p>
+                <p class="text-sm text-slate-400 mt-1 font-medium">Faculty Members</p>
             </div>
-            <div class="p-3">
-                <p class="text-3xl font-extrabold text-navy-900">{{ total_sections }}</p>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Class Sections</p>
+            <div>
+                <p class="text-3xl font-extrabold text-white">{{ total_sections }}<span class="text-brand-400">+</span></p>
+                <p class="text-sm text-slate-400 mt-1 font-medium">Student Sections</p>
             </div>
-            <div class="p-3">
-                <p class="text-3xl font-extrabold text-navy-900">{{ total_rooms }}</p>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Classrooms & Labs</p>
+            <div>
+                <p class="text-3xl font-extrabold text-white">{{ completed_subs }}<span class="text-brand-400">+</span></p>
+                <p class="text-sm text-slate-400 mt-1 font-medium">Classes Recovered</p>
             </div>
-            <div class="p-3">
-                <p class="text-3xl font-extrabold text-brand-600">{{ completed_subs }}</p>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Classes Saved</p>
-            </div>
-            <div class="p-3 col-span-2 md:col-span-1">
-                <p class="text-3xl font-extrabold text-tealAccent-600">{{ idle_hours_saved }} hrs</p>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Idle Hours Recovered</p>
+            <div>
+                <p class="text-3xl font-extrabold text-tealAccent-400">{{ idle_hours_saved }}<span class="text-tealAccent-300">h</span></p>
+                <p class="text-sm text-slate-400 mt-1 font-medium">Idle Hours Saved</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- THE PROBLEM SECTION -->
-<section class="py-20 bg-slate-50 border-b border-slate-200">
+<!-- ═══════════════════════════════════════════════════════════
+     FEATURES SECTION
+════════════════════════════════════════════════════════════ -->
+<section id="features" class="py-20 bg-slate-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center max-w-3xl mx-auto mb-16">
-            <span class="text-xs font-bold text-red-600 uppercase tracking-widest bg-red-50 px-3 py-1 rounded-full border border-red-200">The Problem</span>
-            <h2 class="text-3xl font-extrabold text-navy-900 mt-3">Why Manual Substitutions Fail in Colleges</h2>
-            <p class="text-slate-600 mt-3 text-base">Coordinators currently rely on desperate WhatsApp group calls and frantic phone chains every morning.</p>
+        <div class="text-center mb-14">
+            <span class="inline-block text-xs font-bold text-brand-600 uppercase tracking-widest bg-brand-50 px-4 py-1.5 rounded-full mb-3">Platform Features</span>
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-navy-900 tracking-tight">Everything You Need to Eliminate Idle Hours</h2>
+            <p class="mt-3 text-slate-500 max-w-xl mx-auto text-base">From automated substitution to room allocation — ClassSwap handles the entire coordination workflow intelligently.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold mb-4">
-                    <i data-lucide="clock-alert" class="w-6 h-6"></i>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <!-- Feature 1 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-brand-600 transition-colors">
+                    <i data-lucide="users" class="w-6 h-6 text-brand-600 group-hover:text-white transition-colors"></i>
                 </div>
-                <h3 class="text-lg font-bold text-navy-900 mb-2">Unacceptable Delays & Idle Hours</h3>
-                <p class="text-sm text-slate-600 leading-relaxed">
-                    By the time a coordinator contacts a colleague, 20-30 minutes of class time have already slipped away. Students sit unattended or wander into corridors.
-                </p>
+                <h3 class="font-bold text-navy-900 mb-2">Smart Faculty Substitution</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">AI-ranked substitute recommendations using subject expertise, workload fairness, and department matching. No more phone calls.</p>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold mb-4">
-                    <i data-lucide="scale" class="w-6 h-6"></i>
+            <!-- Feature 2 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-tealAccent-600 transition-colors">
+                    <i data-lucide="building" class="w-6 h-6 text-tealAccent-600 group-hover:text-white transition-colors"></i>
                 </div>
-                <h3 class="text-lg font-bold text-navy-900 mb-2">Unfair Workload & Burnout</h3>
-                <p class="text-sm text-slate-600 leading-relaxed">
-                    Without audit tracking, the same few cooperative junior professors get repeatedly burdened with proxy duties while others are never asked.
-                </p>
+                <h3 class="font-bold text-navy-900 mb-2">Intelligent Room Allocation</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Find genuinely free classrooms for the specific date and period. Capacity-aware and type-aware suggestions (lab vs lecture hall).</p>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold mb-4">
-                    <i data-lucide="building" class="w-6 h-6"></i>
+            <!-- Feature 3 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 transition-colors">
+                    <i data-lucide="calendar" class="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors"></i>
                 </div>
-                <h3 class="text-lg font-bold text-navy-900 mb-2">Room Clashes & Unused Labs</h3>
-                <p class="text-sm text-slate-600 leading-relaxed">
-                    Substitutes walk into rooms only to discover two sections booked for the same lecture hall or specialized computer labs locked without keys.
-                </p>
+                <h3 class="font-bold text-navy-900 mb-2">Timetable Management</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Upload master timetables via CSV, view weekly grids, detect clashes, and manage date-specific overrides seamlessly.</p>
+            </div>
+
+            <!-- Feature 4 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
+                    <i data-lucide="scale" class="w-6 h-6 text-amber-600 group-hover:text-white transition-colors"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">Workload Fairness</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Scoring formula ensures substitutions are distributed fairly. Faculty who've done fewer substitutions get priority, preventing overload.</p>
+            </div>
+
+            <!-- Feature 5 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-500 transition-colors">
+                    <i data-lucide="bell" class="w-6 h-6 text-orange-600 group-hover:text-white transition-colors"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">Real-Time Notifications</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Instant alerts when a substitution request is assigned. Faculty can accept or decline directly from their dashboard.</p>
+            </div>
+
+            <!-- Feature 6 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600 transition-colors">
+                    <i data-lucide="bar-chart-3" class="w-6 h-6 text-purple-600 group-hover:text-white transition-colors"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">Analytics &amp; Reports</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Monthly substitution audit with department-wise recovery rates, faculty workload charts, and one-click PDF/CSV download.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- HOW IT WORKS SECTION -->
+<!-- ═══════════════════════════════════════════════════════════
+     HOW IT WORKS
+════════════════════════════════════════════════════════════ -->
 <section id="how-it-works" class="py-20 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center max-w-3xl mx-auto mb-16">
-            <span class="text-xs font-bold text-brand-600 uppercase tracking-widest bg-brand-50 px-3 py-1 rounded-full border border-brand-200">Workflow Automation</span>
-            <h2 class="text-3xl font-extrabold text-navy-900 mt-3">From Absence to Arranged Substitute in Seconds</h2>
-            <p class="text-slate-600 mt-3">A transparent, zero-friction 4-step workflow that protects permanent timetable records.</p>
+        <div class="text-center mb-14">
+            <span class="inline-block text-xs font-bold text-tealAccent-600 uppercase tracking-widest bg-teal-50 px-4 py-1.5 rounded-full mb-3">The Workflow</span>
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-navy-900 tracking-tight">How ClassSwap Works</h2>
+            <p class="mt-3 text-slate-500 max-w-lg mx-auto">From absence to covered class in four automated steps.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
-            <!-- Step 1 -->
-            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 relative">
-                <div class="w-9 h-9 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-sm mb-4">1</div>
-                <h4 class="font-bold text-navy-900 mb-2">Absence Reported</h4>
-                <p class="text-xs text-slate-600">Faculty selects absence date & periods in their portal, or HOD marks on their behalf.</p>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="text-center">
+                <div class="w-14 h-14 rounded-2xl bg-brand-600 text-white text-xl font-extrabold flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/25">1</div>
+                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="user-x" class="w-5 h-5 text-brand-600"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">Faculty Marks Absence</h3>
+                <p class="text-sm text-slate-500">Faculty selects date and period, submits absence reason. Admin is immediately notified.</p>
             </div>
-
-            <!-- Step 2 -->
-            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 relative">
-                <div class="w-9 h-9 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-sm mb-4">2</div>
-                <h4 class="font-bold text-navy-900 mb-2">Algorithm Ranks Faculty</h4>
-                <p class="text-xs text-slate-600">Filters busy professors, scores subject relevance (50%), monthly fairness (30%), and department (20%).</p>
+            <div class="text-center">
+                <div class="w-14 h-14 rounded-2xl bg-brand-600 text-white text-xl font-extrabold flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/25">2</div>
+                <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="brain-circuit" class="w-5 h-5 text-purple-600"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">AI Ranks Substitutes</h3>
+                <p class="text-sm text-slate-500">Engine scores available faculty by subject match, workload fairness, and department alignment.</p>
             </div>
-
-            <!-- Step 3 -->
-            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 relative">
-                <div class="w-9 h-9 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-sm mb-4">3</div>
-                <h4 class="font-bold text-navy-900 mb-2">Room Availability Fit</h4>
-                <p class="text-xs text-slate-600">Scans occupied lecture halls, checks section strength capacity, and validates lab equipment needs.</p>
+            <div class="text-center">
+                <div class="w-14 h-14 rounded-2xl bg-brand-600 text-white text-xl font-extrabold flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/25">3</div>
+                <div class="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="door-open" class="w-5 h-5 text-tealAccent-600"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">Free Room Allocated</h3>
+                <p class="text-sm text-slate-500">System identifies genuinely free classrooms with sufficient capacity for the specific period.</p>
             </div>
-
-            <!-- Step 4 -->
-            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 relative">
-                <div class="w-9 h-9 rounded-full bg-tealAccent-600 text-white font-extrabold flex items-center justify-center text-sm mb-4">4</div>
-                <h4 class="font-bold text-navy-900 mb-2">Accepted & Timetable Live</h4>
-                <p class="text-xs text-slate-600">Substitute clicks Accept. The date-specific schedule updates seamlessly without touching master data.</p>
+            <div class="text-center">
+                <div class="w-14 h-14 rounded-2xl bg-tealAccent-600 text-white text-xl font-extrabold flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/25">✓</div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-emerald-600"></i>
+                </div>
+                <h3 class="font-bold text-navy-900 mb-2">Class Continues</h3>
+                <p class="text-sm text-slate-500">Substitute accepts, date-specific override is saved, and no class hour is wasted.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- THE FAIRNESS ALGORITHM EXPLAINED -->
-<section id="algorithm" class="py-20 bg-navy-950 text-white">
+<!-- ═══════════════════════════════════════════════════════════
+     WHY CLASSSWAP
+════════════════════════════════════════════════════════════ -->
+<section class="py-20 bg-slate-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+
+            <!-- Left: Points -->
             <div>
-                <span class="text-xs font-bold text-tealAccent-400 uppercase tracking-widest bg-navy-900 px-3 py-1 rounded-full border border-slate-800">Core Recommendation Engine</span>
-                <h2 class="text-3xl font-extrabold text-white mt-4">The Mathematical Fairness Formula</h2>
-                <p class="text-slate-300 mt-4 leading-relaxed text-sm">
-                    ClassSwap never relies on random assignments or arbitrary guesswork. Every recommendation is scored through our multi-factor formula:
-                </p>
+                <span class="inline-block text-xs font-bold text-brand-600 uppercase tracking-widest bg-brand-50 px-4 py-1.5 rounded-full mb-4">Why ClassSwap</span>
+                <h2 class="text-3xl font-extrabold text-navy-900 tracking-tight mb-6">Replace Manual Coordination<br>with Intelligent Automation</h2>
 
-                <div class="mt-6 p-4 rounded-xl bg-navy-900 border border-slate-800 font-mono text-sm text-tealAccent-300">
-                    Final Score = (0.5 &times; Subject Match) + (0.3 &times; Fairness Score) + (0.2 &times; Department Match)
-                </div>
-
-                <div class="mt-6 space-y-4 text-xs text-slate-300">
-                    <div class="flex items-start space-x-3">
-                        <div class="w-6 h-6 rounded bg-brand-600/30 text-brand-400 font-bold flex items-center justify-center flex-shrink-0 mt-0.5">50%</div>
-                        <div>
-                            <strong class="text-white">Subject Match:</strong> 1.0 if qualified for the exact subject; 0.5 if faculty teaches a subject in the same discipline; 0.0 otherwise.
+                <ul class="space-y-5">
+                    <li class="flex items-start space-x-4">
+                        <div class="w-9 h-9 rounded-xl bg-tealAccent-50 border border-tealAccent-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i data-lucide="scale" class="w-5 h-5 text-tealAccent-600"></i>
                         </div>
-                    </div>
-                    <div class="flex items-start space-x-3">
-                        <div class="w-6 h-6 rounded bg-tealAccent-600/30 text-tealAccent-400 font-bold flex items-center justify-center flex-shrink-0 mt-0.5">30%</div>
                         <div>
-                            <strong class="text-white">Monthly Fairness Score:</strong> Dynamically normalized based on substitutions covered this month. Faculty with fewer substitutions receive higher priority to distribute the load evenly.
+                            <h4 class="font-bold text-navy-900 text-sm">Fairness Algorithm</h4>
+                            <p class="text-sm text-slate-500 mt-0.5">Mathematically balanced workload distribution using a proven scoring formula: 50% subject match + 30% fairness + 20% department.</p>
                         </div>
-                    </div>
-                    <div class="flex items-start space-x-3">
-                        <div class="w-6 h-6 rounded bg-purple-600/30 text-purple-400 font-bold flex items-center justify-center flex-shrink-0 mt-0.5">20%</div>
+                    </li>
+                    <li class="flex items-start space-x-4">
+                        <div class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i data-lucide="book-open-check" class="w-5 h-5 text-brand-600"></i>
+                        </div>
                         <div>
-                            <strong class="text-white">Department Match:</strong> 1.0 if faculty belongs to the same department as the class subject; 0.0 otherwise.
+                            <h4 class="font-bold text-navy-900 text-sm">Subject Expertise Matching</h4>
+                            <p class="text-sm text-slate-500 mt-0.5">Only faculty qualified in the required subject are recommended. Subjects qualifications are pre-configured per faculty.</p>
                         </div>
-                    </div>
-                </div>
+                    </li>
+                    <li class="flex items-start space-x-4">
+                        <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i data-lucide="zap" class="w-5 h-5 text-amber-600"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-navy-900 text-sm">Zero Manual Coordination</h4>
+                            <p class="text-sm text-slate-500 mt-0.5">Eliminate WhatsApp groups and phone calls. All coordination happens inside ClassSwap — structured, logged, and auditable.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start space-x-4">
+                        <div class="w-9 h-9 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i data-lucide="file-bar-chart" class="w-5 h-5 text-purple-600"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-navy-900 text-sm">PDF &amp; CSV Reports</h4>
+                            <p class="text-sm text-slate-500 mt-0.5">Generate monthly substitution audit reports for NAAC/accreditation compliance with one click.</p>
+                        </div>
+                    </li>
+                </ul>
             </div>
 
-            <!-- Algorithm Visualization Card -->
-            <div class="bg-navy-900 p-6 rounded-2xl border border-slate-800 shadow-2xl">
-                <h4 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
-                    <span>Live Recommendation Preview</span>
-                    <span class="text-[11px] font-normal text-emerald-400">Class: Data Structures (P3)</span>
-                </h4>
-
-                <div class="space-y-3">
-                    <!-- Candidate 1 -->
-                    <div class="p-3.5 rounded-xl bg-navy-950 border border-brand-500/40">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-bold text-white flex items-center">
-                                <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2"></span>
-                                Dr. Priya Nair
-                                <span class="ml-2 text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded-full">Top Choice</span>
-                            </span>
-                            <span class="font-mono font-bold text-brand-400">Score: 0.96 / 1.00</span>
+            <!-- Right: Stats card -->
+            <div class="relative">
+                <div class="bg-navy-900 rounded-2xl p-8 shadow-xl">
+                    <h3 class="text-white font-bold text-lg mb-6">Scoring Formula</h3>
+                    <div class="space-y-5">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-semibold text-slate-300">Subject Match</span>
+                                <span class="text-sm font-bold text-brand-400">50%</span>
+                            </div>
+                            <div class="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-brand-500 rounded-full" style="width:50%"></div>
+                            </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800 text-[10px] text-slate-400">
-                            <div>Subject: <span class="text-white font-semibold">1.00 (DS Qual.)</span></div>
-                            <div>Fairness: <span class="text-white font-semibold">1.00 (0 subs)</span></div>
-                            <div>Dept: <span class="text-white font-semibold">1.00 (CSE)</span></div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-semibold text-slate-300">Fairness Score</span>
+                                <span class="text-sm font-bold text-tealAccent-400">30%</span>
+                            </div>
+                            <div class="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-tealAccent-500 rounded-full" style="width:30%"></div>
+                            </div>
                         </div>
-                    </div>
-
-                    <!-- Candidate 2 -->
-                    <div class="p-3.5 rounded-xl bg-navy-950 border border-slate-800">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-slate-200">Dr. Anita Sharma</span>
-                            <span class="font-mono text-slate-300">Score: 0.85 / 1.00</span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800 text-[10px] text-slate-400">
-                            <div>Subject: <span class="text-white">0.50 (CSE Area)</span></div>
-                            <div>Fairness: <span class="text-white">0.85 (1 sub)</span></div>
-                            <div>Dept: <span class="text-white">1.00 (CSE)</span></div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-semibold text-slate-300">Department Match</span>
+                                <span class="text-sm font-bold text-purple-400">20%</span>
+                            </div>
+                            <div class="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-purple-500 rounded-full" style="width:20%"></div>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- Candidate 3 -->
-                    <div class="p-3.5 rounded-xl bg-navy-950 border border-slate-800">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-slate-200">Prof. Vikram Singh</span>
-                            <span class="font-mono text-slate-300">Score: 0.76 / 1.00</span>
+                    <div class="mt-6 pt-5 border-t border-slate-800">
+                        <p class="text-xs text-slate-400 font-mono bg-slate-800 p-3 rounded-lg">Score = (0.5 × SubjectMatch) + (0.3 × Fairness) + (0.2 × DeptMatch)</p>
+                    </div>
+                    <div class="mt-5 grid grid-cols-2 gap-3">
+                        <div class="bg-slate-800 rounded-xl p-4 text-center">
+                            <p class="text-2xl font-extrabold text-white">{{ idle_hours_saved }}h</p>
+                            <p class="text-xs text-slate-400 mt-1">Hours Saved</p>
                         </div>
-                        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800 text-[10px] text-slate-400">
-                            <div>Subject: <span class="text-white">0.50 (CSE Area)</span></div>
-                            <div>Fairness: <span class="text-white">0.70 (2 subs)</span></div>
-                            <div>Dept: <span class="text-white">1.00 (CSE)</span></div>
+                        <div class="bg-tealAccent-600/20 border border-tealAccent-500/30 rounded-xl p-4 text-center">
+                            <p class="text-2xl font-extrabold text-tealAccent-400">{{ completed_subs }}</p>
+                            <p class="text-xs text-slate-400 mt-1">Classes Covered</p>
                         </div>
                     </div>
-                </div>
-
-                <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
-                    <span>Free Room: <strong class="text-tealAccent-400">LH-101 (70 seats)</strong></span>
-                    <a href="/login" class="text-brand-400 hover:text-brand-300 font-semibold">Explore Engine &rarr;</a>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- CALL TO ACTION BANNER -->
-<section class="py-16 bg-gradient-to-r from-brand-700 via-brand-600 to-tealAccent-600 text-white text-center">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 class="text-3xl font-extrabold tracking-tight">Ready to eliminate wasted class hours?</h2>
-        <p class="mt-4 text-brand-100 text-base max-w-2xl mx-auto">
-            Experience the automated substitution workflow, master timetable management, and audit reporting in our live demo.
-        </p>
-        <div class="mt-8 flex justify-center gap-4">
-            <a href="/login" class="px-8 py-3.5 rounded-xl font-bold text-navy-950 bg-white hover:bg-slate-100 shadow-xl transition-all hover:scale-105">
-                Sign In to Portal
+<!-- ═══════════════════════════════════════════════════════════
+     CTA SECTION
+════════════════════════════════════════════════════════════ -->
+<section class="py-16 bg-brand-600">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-extrabold text-white mb-4">Ready to Eliminate Idle Class Hours?</h2>
+        <p class="text-brand-100 mb-8 text-lg">Join ClassSwap today. Free for colleges. No setup fees.</p>
+        <div class="flex flex-wrap justify-center gap-4">
+            <a href="/register" class="inline-flex items-center px-8 py-3.5 rounded-xl text-sm font-bold text-brand-700 bg-white hover:bg-brand-50 shadow-lg transition-all hover:-translate-y-0.5">
+                <i data-lucide="user-plus" class="w-4 h-4 mr-2"></i>
+                Create Faculty Account
+            </a>
+            <a href="/login" class="inline-flex items-center px-8 py-3.5 rounded-xl text-sm font-bold text-white border-2 border-white/40 hover:border-white hover:bg-white/10 transition-all">
+                <i data-lucide="log-in" class="w-4 h-4 mr-2"></i>
+                Sign In
             </a>
         </div>
+        <p class="mt-6 text-brand-200 text-sm">Demo: <code class="bg-white/10 px-2 py-0.5 rounded">admin@classswap.edu</code> / <code class="bg-white/10 px-2 py-0.5 rounded">Admin@123</code></p>
     </div>
 </section>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+</script>
+{% endblock %}
 {% endblock %}
