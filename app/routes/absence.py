@@ -13,6 +13,7 @@ from app.services.absence import (
     mark_absence,
 )
 from app.services.suggestion import suggest_candidates
+from app.services.substitution import auto_request_for_hod_absence
 
 
 router = APIRouter()
@@ -36,6 +37,9 @@ def create_absences(
         raise HTTPException(status_code=422, detail=str(error)) from error
     except AbsenceConflict as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    if faculty.role == "hod":
+        for absence in absences:
+            auto_request_for_hod_absence(session, absence)
     return [AbsenceRead.model_validate(absence) for absence in absences]
 
 

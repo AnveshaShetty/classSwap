@@ -152,3 +152,193 @@ def test_suggestions_exclude_active_substitutes_in_target_slot(
 
     assert response.status_code == 200
     assert substitute_id not in {candidate["faculty_id"] for candidate in response.json()}
+
+
+def _copy_user(session: Session, user_id: int) -> User:
+    user = session.get(User, user_id)
+    assert user is not None
+    return User(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        password_hash=user.password_hash,
+        role=user.role,
+        department=user.department,
+        teaches=user.teaches,
+    )
+
+
+def test_substitution_request_inbox_decline_offers_next_candidate(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-23", "periods": [3], "reason": "Conference"},
+    )
+    suggestions = client.get("/absences/%d/suggestions" % created.json()[0]["id"]).json()
+    assert len(suggestions) >= 2
+    selected_id = suggestions[0]["faculty_id"]
+
+    request = client.post(
+        "/substitutions",
+        json={"absence_id": created.json()[0]["id"], "substitute_id": selected_id},
+    )
+
+    assert request.status_code == 200
+    assert request.json()["status"] == "pending"
+    with Session(test_engine) as session:
+        candidate = _copy_user(session, selected_id)
+    app.dependency_overrides[get_current_user] = lambda: candidate
+
+    inbox = client.get("/substitutions/inbox")
+    assert inbox.status_code == 200
+    assert [item["substitution"]["id"] for item in inbox.json()] == [request.json()["id"]]
+    declined = client.patch(
+        "/substitutions/%d" % request.json()["id"],
+        json={"status": "declined"},
+    )
+
+    assert declined.status_code == 200
+    assert declined.json()["substitution"]["status"] == "declined"
+    assert declined.json()["next_request"] is not None
+    assert declined.json()["next_request"]["substitute_id"] != selected_id
+
+
+def test_substitution_request_can_be_accepted(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-23", "periods": [3], "reason": "Training programme"},
+    )
+    selected_id = client.get(
+        "/absences/%d/suggestions" % created.json()[0]["id"]
+    ).json()[0]["faculty_id"]
+    request = client.post(
+        "/substitutions",
+        json={"absence_id": created.json()[0]["id"], "substitute_id": selected_id},
+    )
+    assert request.status_code == 200
+
+    with Session(test_engine) as session:
+        candidate = _copy_user(session, selected_id)
+    app.dependency_overrides[get_current_user] = lambda: candidate
+    accepted = client.patch(
+        "/substitutions/%d" % request.json()["id"],
+        json={"status": "accepted"},
+    )
+
+    assert accepted.status_code == 200
+    assert accepted.json()["substitution"]["status"] == "accepted"
+    assert accepted.json()["next_request"] is None
+
+
+def test_hod_absence_automatically_requests_top_suggestion(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.role == "hod"))
+        assert hod is not None
+        hod_user = _copy_user(session, hod.id)
+        scheduled_class = session.scalar(
+            select(Timetable).where(
+                Timetable.faculty_id == hod.id,
+                Timetable.day_of_week == 0,
+            ).limit(1)
+        )
+        assert scheduled_class is not None
+        period = scheduled_class.period_no
+    app.dependency_overrides[get_current_user] = lambda: hod_user
+
+    created = client.post(
+        "/absences",
+        json={
+            "date": "2026-11-23",
+            "periods": [period],
+            "reason": "Medical leave",
+        },
+    )
+
+    assert created.status_code == 200
+    with Session(test_engine) as session:
+        requests = list(session.scalars(
+            select(Substitution).where(Substitution.absence_id == created.json()[0]["id"])
+        ))
+        assert len(requests) == 1
+        assert requests[0].status == "pending"
+
+
+def test_same_substitute_cannot_be_requested_for_two_classes_in_one_slot(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    first_absence = client.post(
+        "/absences",
+        json={"date": "2026-11-23", "periods": [3], "reason": "Medical leave"},
+    ).json()[0]
+    suggestions = client.get(
+        "/absences/%d/suggestions" % first_absence["id"]
+    ).json()
+    substitute_id = suggestions[0]["faculty_id"]
+    first_request = client.post(
+        "/substitutions",
+        json={"absence_id": first_absence["id"], "substitute_id": substitute_id},
+    )
+    assert first_request.status_code == 200
+
+    with Session(test_engine) as session:
+        scheduled_class = session.scalar(
+            select(Timetable).where(
+                Timetable.day_of_week == 0,
+                Timetable.period_no == 3,
+                Timetable.section_id != session.scalar(
+                    select(Timetable.section_id).where(
+                        Timetable.id == first_absence["timetable_id"]
+                    )
+                ),
+            ).limit(1)
+        )
+        assert scheduled_class is not None
+        second_absence = Absence(
+            timetable_id=scheduled_class.id,
+            faculty_id=scheduled_class.faculty_id,
+            date=date(2026, 11, 23),
+            period_no=3,
+            reason="Personal work",
+        )
+        session.add(second_absence)
+        session.flush()
+        second_absence_id = second_absence.id
+        second_owner = _copy_user(session, scheduled_class.faculty_id)
+        session.commit()
+    app.dependency_overrides[get_current_user] = lambda: second_owner
+
+    conflicting_request = client.post(
+        "/substitutions",
+        json={"absence_id": second_absence_id, "substitute_id": substitute_id},
+    )
+
+    assert conflicting_request.status_code == 409
+
+
+def test_free_room_lookup_respects_class_type_and_section_capacity(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-23", "periods": [3], "reason": "Training programme"},
+    ).json()[0]
+
+    rooms = client.get("/rooms/free", params={"absence_id": created["id"]})
+
+    assert rooms.status_code == 200
+    with Session(test_engine) as session:
+        timetable = session.get(Timetable, created["timetable_id"])
+        assert timetable is not None
+        original_room = timetable.room_id
+    assert all(room["type"] == "class" for room in rooms.json())
+    assert all(room["id"] != original_room for room in rooms.json())
