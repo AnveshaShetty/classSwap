@@ -5,9 +5,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql+psycopg://classswap:classswap@localhost:5432/classswap"
-    jwt_secret_key: str = "local-development-only"
+    jwt_secret_key: str = "local-development-key-change-me-32chars"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
+    auth_cookie_name: str = "classswap_access"
+    cookie_secure: bool = False
     max_period: int = 7
     break_after: str = "2,4"
     subject_match_weight: float = 0.35
