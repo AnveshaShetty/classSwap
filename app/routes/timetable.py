@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_roles
+from app.core.dependencies import get_current_user, require_acting_admin
 from app.database import get_db
 from app.models import User
 from app.services.timetable import (
@@ -46,12 +46,12 @@ def read_timetable(
 @router.post("/timetable/import")
 async def import_timetable(
     file: UploadFile = File(...),
-    _: User = Depends(require_roles("hod", "super_admin")),
+    actor: User = Depends(require_acting_admin("timetable")),
     session: Session = Depends(get_db),
 ) -> dict[str, int]:
     content = await file.read()
     try:
-        imported_rows = import_timetable_csv(session, content)
+        imported_rows = import_timetable_csv(session, content, actor=actor)
     except TimetableCsvError as error:
         raise HTTPException(
             status_code=422,

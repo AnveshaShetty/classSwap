@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.dependencies import get_current_user
 from app.database import Base, get_db
 from app.main import app
-from app.models import Absence, Substitution, Timetable, User
+from app.models import Absence, AdminChain, AuditLog, Leave, Substitution, Timetable, User
 from scripts.seed import load_seed
 
 
@@ -342,3 +342,138 @@ def test_free_room_lookup_respects_class_type_and_section_capacity(
         original_room = timetable.room_id
     assert all(room["type"] == "class" for room in rooms.json())
     assert all(room["id"] != original_room for room in rooms.json())
+
+
+def test_whole_day_leave_creates_absences_and_audit_entry(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, faculty = absence_context
+    days_until_monday = (7 - date.today().weekday()) % 7 or 7
+    leave_date = date.today() + timedelta(days=days_until_monday)
+
+    response = client.post(
+        "/leaves",
+        json={"date": leave_date.isoformat(), "reason": "Conference"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["absences_created"] > 0
+    with Session(test_engine) as session:
+        assert session.get(Leave, (faculty.id, leave_date)) is not None
+        assert session.scalar(
+            select(func.count()).select_from(Absence).where(
+                Absence.faculty_id == faculty.id,
+                Absence.date == leave_date,
+            )
+        ) == response.json()["absences_created"]
+        assert session.scalar(
+            select(func.count()).select_from(AuditLog).where(AuditLog.action == "leave.created")
+        ) == 1
+    marked_absence = client.post(
+        "/absences",
+        json={"date": leave_date.isoformat(), "periods": [3], "reason": "Personal work"},
+    )
+    assert marked_absence.status_code == 409
+
+
+def test_cancelling_whole_day_leave_removes_its_absences(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, faculty = absence_context
+    days_until_monday = (7 - date.today().weekday()) % 7 or 7
+    leave_date = date.today() + timedelta(days=days_until_monday)
+    created = client.post(
+        "/leaves",
+        json={"date": leave_date.isoformat(), "reason": "Personal work"},
+    )
+    assert created.status_code == 200
+
+    deleted = client.delete("/leaves/%s" % leave_date.isoformat())
+
+    assert deleted.status_code == 204
+    with Session(test_engine) as session:
+        assert session.get(Leave, (faculty.id, leave_date)) is None
+        assert session.scalar(
+            select(func.count()).select_from(Absence).where(
+                Absence.faculty_id == faculty.id,
+                Absence.date == leave_date,
+            )
+        ) == 0
+        assert session.scalar(
+            select(func.count()).select_from(AuditLog).where(AuditLog.action == "leave.cancelled")
+        ) == 1
+
+
+def test_acting_admin_falls_back_to_first_available_chain_member(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    with Session(test_engine) as session:
+        for chain_entry, user in session.execute(
+            select(AdminChain, User).join(User, User.id == AdminChain.user_id)
+        ):
+            session.add(Leave(user_id=user.id, date=date.today()))
+        session.commit()
+
+    acting = client.get("/admin/acting")
+
+    assert acting.status_code == 200
+    assert acting.json()["email"] == "principal.demo@demo.edu"
+    assert acting.json()["role"] == "super_admin"
+
+
+def test_stand_in_admin_cannot_import_timetable(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.role == "hod"))
+        assert hod is not None
+        session.add(Leave(user_id=hod.id, date=date.today()))
+        stand_in = session.scalar(
+            select(User).where(User.email == "arjun.kulkarni@demo.edu")
+        )
+        assert stand_in is not None
+        stand_in_user = _copy_user(session, stand_in.id)
+        session.commit()
+    app.dependency_overrides[get_current_user] = lambda: stand_in_user
+
+    acting = client.get("/admin/acting")
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("empty.csv", b"section,day,period,subject,faculty_email,room\n", "text/csv")},
+    )
+
+    assert acting.status_code == 200
+    assert acting.json()["email"] == "arjun.kulkarni@demo.edu"
+    assert response.status_code == 403
+
+
+def test_acting_hod_can_edit_chain_and_the_change_is_audited(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.role == "hod"))
+        assert hod is not None
+        hod_user = _copy_user(session, hod.id)
+        chain = [
+            {"position": entry.position, "email": user.email}
+            for entry, user in session.execute(
+                select(AdminChain, User).join(User, User.id == AdminChain.user_id)
+            )
+        ]
+    app.dependency_overrides[get_current_user] = lambda: hod_user
+
+    response = client.put(
+        "/admin/chain",
+        json={"department": "Computer Science and Design", "entries": chain},
+    )
+
+    assert response.status_code == 200
+    with Session(test_engine) as session:
+        assert session.scalar(
+            select(func.count()).select_from(AuditLog).where(
+                AuditLog.action == "admin_chain.updated"
+            )
+        ) == 1

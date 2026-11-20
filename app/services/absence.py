@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Absence, Timetable, User
+from app.models import Absence, Leave, Timetable, User
 
 
 class AbsenceSelectionError(ValueError):
@@ -33,6 +33,8 @@ def _create_absences(
         raise AbsenceSelectionError("Periods must be between 1 and 7.")
     if not reason.strip():
         raise AbsenceSelectionError("Please provide a reason for the absence.")
+    if session.get(Leave, (faculty_id, absence_date)) is not None:
+        raise AbsenceConflict("A whole-day leave is already recorded for this date.")
 
     scheduled_classes = list(session.scalars(
         select(Timetable).where(

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Absence, Room, Section, Subject, Substitution, Timetable, User
+from app.models import Absence, AuditLog, Room, Section, Subject, Substitution, Timetable, User
 from app.services.suggestion import Suggestion, suggest_candidates
 
 
@@ -142,16 +142,24 @@ def auto_request_for_hod_absence(session: Session, absence: Absence) -> Substitu
     suggestions = suggest_candidates(session, absence.id)
     if not suggestions:
         return None
-    return _run_transaction(
-        session,
-        lambda: _create_request(
+    def create_auto_request() -> Substitution:
+        request = _create_request(
             session,
             absence.id,
             suggestions[0].faculty_id,
             absence.faculty_id,
             enforce_owner=False,
-        ),
-    )
+        )
+        session.add(AuditLog(
+            user_id=absence.faculty_id,
+            acting_as="hod",
+            action="substitution.auto_requested",
+            target="absence:%d substitute:%d" % (absence.id, request.substitute_id),
+        ))
+        session.flush()
+        return request
+
+    return _run_transaction(session, create_auto_request)
 
 
 def _offer_next_candidate(session: Session, absence: Absence) -> Substitution | None:

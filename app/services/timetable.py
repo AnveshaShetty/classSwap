@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Absence,
+    AuditLog,
     FacultySubject,
     Room,
     Section,
@@ -162,7 +163,7 @@ def _validate_rows(session: Session, frame: pd.DataFrame) -> list[TimetableRow]:
     return validated
 
 
-def _import_in_transaction(session: Session, content: bytes) -> int:
+def _import_in_transaction(session: Session, content: bytes, actor: User | None = None) -> int:
     frame = parse_timetable_csv(content)
     rows = _validate_rows(session, frame)
     incoming_by_slot = {row.slot: row for row in rows}
@@ -214,18 +215,30 @@ def _import_in_transaction(session: Session, content: bytes) -> int:
             period_no=row.period,
         ))
     session.flush()
+    if actor is not None:
+        session.add(AuditLog(
+            user_id=actor.id,
+            acting_as=actor.role,
+            action="timetable.imported",
+            target="%d timetable row(s)" % len(rows),
+        ))
+        session.flush()
     return len(rows)
 
 
-def import_timetable_csv(session: Session, content: bytes) -> int:
+def import_timetable_csv(
+    session: Session,
+    content: bytes,
+    actor: User | None = None,
+) -> int:
     if session.in_transaction():
         with session.begin_nested():
-            imported_rows = _import_in_transaction(session, content)
+            imported_rows = _import_in_transaction(session, content, actor)
         session.commit()
         return imported_rows
 
     with session.begin():
-        return _import_in_transaction(session, content)
+        return _import_in_transaction(session, content, actor)
 
 
 def build_timetable_grid(
