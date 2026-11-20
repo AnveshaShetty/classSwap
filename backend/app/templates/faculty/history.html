@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Workload & Substitution History — ClassSwap{% endblock %}
+
+{% block faculty_content %}
+<div class="space-y-6">
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+            <h2 class="text-xl font-bold text-navy-900">Your Substitution Workload History</h2>
+            <p class="text-xs text-slate-500 mt-1">Audit log of classes covered, subjects taught, and total proxy hours credited.</p>
+        </div>
+        <div class="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 text-right">
+            <span class="text-[10px] uppercase font-bold text-slate-500">Total Proxy Records</span>
+            <p class="text-lg font-extrabold text-brand-600">{{ substitutions|length }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-xs text-left">
+                <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-5 py-3.5">Date & Period</th>
+                        <th class="px-5 py-3.5">Subject Covered</th>
+                        <th class="px-5 py-3.5">Section</th>
+                        <th class="px-5 py-3.5">Absent Colleague</th>
+                        <th class="px-5 py-3.5">Room</th>
+                        <th class="px-5 py-3.5">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for sub in substitutions %}
+                    <tr class="hover:bg-slate-50/70">
+                        <td class="px-5 py-4 font-bold text-navy-900">{{ sub.absence.date }} (Period {{ sub.absence.period_no }})</td>
+                        <td class="px-5 py-4 font-semibold text-slate-800">{{ sub.timetable_entry.subject.name }}</td>
+                        <td class="px-5 py-4 text-slate-600">{{ sub.timetable_entry.section.name }}</td>
+                        <td class="px-5 py-4 text-slate-600">{{ sub.absence.faculty.name }}</td>
+                        <td class="px-5 py-4 font-mono text-slate-700">{{ sub.room.name if sub.room else sub.timetable_entry.room.name }}</td>
+                        <td class="px-5 py-4">
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold {% if sub.status == 'Accepted' or sub.status == 'Completed' %}bg-emerald-100 text-emerald-800{% elif sub.status == 'Pending' %}bg-amber-100 text-amber-800{% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {{ sub.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-5 py-8 text-center text-slate-400">
+                            No substitution history records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard — ClassSwap{% endblock %}
+{% block header_title %}College Executive Overview{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Top Action & Welcome Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+            <h2 class="text-xl font-extrabold text-navy-900 tracking-tight">Welcome back, {{ user.name }}</h2>
+            <p class="text-xs text-slate-500 mt-1">Here is the live operational status of faculty schedules, classroom availability, and substitution recoveries for today.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="/admin/absences" class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-sm shadow-red-500/20 transition-all">
+                <i data-lucide="user-x" class="w-3.5 h-3.5 mr-1.5"></i> Mark Absence
+            </a>
+            <a href="/admin/timetable" class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 shadow-sm shadow-brand-500/20 transition-all">
+                <i data-lucide="upload" class="w-3.5 h-3.5 mr-1.5"></i> Upload Timetable
+            </a>
+            <a href="/admin/free-rooms" class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all">
+                <i data-lucide="door-open" class="w-3.5 h-3.5 mr-1.5 text-tealAccent-600"></i> Free Rooms
+            </a>
+            <a href="/api/reports/download/pdf" class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all" title="Download Monthly PDF">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5 text-brand-600"></i> PDF Report
+            </a>
+        </div>
+    </div>
+
+    <!-- 8 SUMMARY METRIC CARDS -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Total Faculty -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Faculty</p>
+                <p class="text-2xl font-extrabold text-navy-900 mt-1">{{ total_faculty }}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Active professors</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-blue-50 text-brand-600 flex items-center justify-center font-bold">
+                <i data-lucide="users" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Total Sections -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Sections</p>
+                <p class="text-2xl font-extrabold text-navy-900 mt-1">{{ total_sections }}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Across semesters</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Total Classrooms -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Classrooms & Labs</p>
+                <p class="text-2xl font-extrabold text-navy-900 mt-1">{{ total_rooms }}</p>
+                <p class="text-[11px] text-tealAccent-600 font-semibold mt-0.5">Monitored live</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-teal-50 text-tealAccent-600 flex items-center justify-center font-bold">
+                <i data-lucide="building" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Today's Classes -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Classes</p>
+                <p class="text-2xl font-extrabold text-navy-900 mt-1">{{ todays_classes_count }}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">{{ day_name }} schedule</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Faculty Absences Today -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Faculty Absences</p>
+                <p class="text-2xl font-extrabold text-red-600 mt-1">{{ faculty_absences_today }}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Marked for today</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                <i data-lucide="user-x" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Pending Substitutions -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Swaps</p>
+                <p class="text-2xl font-extrabold text-amber-600 mt-1">{{ pending_sub_requests }}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Awaiting acceptance</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Completed Substitutions -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Substitutions Done</p>
+                <p class="text-2xl font-extrabold text-emerald-600 mt-1">{{ completed_subs }}</p>
+                <p class="text-[11px] text-emerald-600 font-semibold mt-0.5">Zero classes cancelled</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Idle Hours Recovered -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Idle Hours Saved</p>
+                <p class="text-2xl font-extrabold text-brand-600 mt-1">{{ idle_hours_saved }} hrs</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">50 min periods calculated</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold">
+                <i data-lucide="hourglass" class="w-5 h-5"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT GRIDS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- LEFT 2 COLS: Today's Timetable + Pending Substitute Approvals -->
+        <div class="lg:col-span-2 space-y-8">
+            <!-- 1. Today's Timetable Overview -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-navy-900 text-base">Today's Timetable Overview ({{ day_name }})</h3>
+                        <p class="text-xs text-slate-500">Live view of master timetable and active substitutes</p>
+                    </div>
+                    <a href="/admin/timetable" class="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center">
+                        Full Grid &rarr;
+                    </a>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-xs text-left">
+                        <thead class="bg-slate-50 text-slate-600 uppercase tracking-wider font-semibold">
+                            <tr>
+                                <th class="px-4 py-3">Period</th>
+                                <th class="px-4 py-3">Section</th>
+                                <th class="px-4 py-3">Subject</th>
+                                <th class="px-4 py-3">Assigned Faculty</th>
+                                <th class="px-4 py-3">Room</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for tt in today_timetable[:7] %}
+                            <tr class="hover:bg-slate-50/80 transition-colors">
+                                <td class="px-4 py-3 font-bold text-navy-900">Period {{ tt.period_no }}</td>
+                                <td class="px-4 py-3 font-semibold text-slate-700">{{ tt.section.name }}</td>
+                                <td class="px-4 py-3 text-slate-800">{{ tt.subject.name }}</td>
+                                <td class="px-4 py-3 text-slate-700">{{ tt.faculty.name }}</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
+                                        {{ tt.room.name }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-slate-400">
+                                    No classes scheduled for today.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. Pending Substitute Approvals -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-navy-900 text-base">Pending Substitution Requests</h3>
+                        <p class="text-xs text-slate-500">Awaiting substitute acceptance or coordinator action</p>
+                    </div>
+                    <a href="/admin/substitutions" class="text-xs font-semibold text-brand-600 hover:text-brand-700">View All</a>
+                </div>
+                
+                <div class="divide-y divide-slate-100">
+                    {% for sub in pending_subs %}
+                    <div class="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">
+                                <i data-lucide="clock" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-navy-900">
+                                    {{ sub.substitute.name }} <span class="font-normal text-slate-500">requested for</span> {{ sub.timetable_entry.subject.name }}
+                                </p>
+                                <p class="text-[11px] text-slate-500">
+                                    Date: {{ sub.absence.date }} | Period {{ sub.absence.period_no }} | Room: {{ sub.room.name if sub.room else 'Original Room' }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                Awaiting Response
+                            </span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-8 text-center text-slate-400 text-xs">
+                        <i data-lucide="check-circle-2" class="w-8 h-8 mx-auto text-emerald-500 mb-2"></i>
+                        No pending substitution approvals. All requested classes are arranged!
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 3. Faculty Workload Distribution Chart -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="font-bold text-navy-900 text-base">Faculty Workload Distribution</h3>
+                        <p class="text-xs text-slate-500">Substitutions covered this month (Fairness tracking)</p>
+                    </div>
+                    <span class="text-xs font-semibold text-tealAccent-600 bg-teal-50 px-2.5 py-1 rounded-lg">Fairness Metric</span>
+                </div>
+                <div class="h-64">
+                    <canvas id="workloadChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT 1 COL: Recent Absences + Recent Completions -->
+        <div class="space-y-8">
+            <!-- Recent Faculty Absences -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-navy-900 text-base">Recent Absences</h3>
+                        <p class="text-xs text-slate-500">Requires substitute arrangement</p>
+                    </div>
+                    <a href="/admin/absences" class="text-xs font-semibold text-brand-600 hover:text-brand-700">Manage</a>
+                </div>
+
+                <div class="divide-y divide-slate-100">
+                    {% for a in recent_absences %}
+                    <div class="p-4 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-bold text-navy-900">{{ a.faculty.name }}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if a.status == 'Substitution Arranged' %}bg-emerald-100 text-emerald-800{% elif a.status == 'Processing' %}bg-amber-100 text-amber-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ a.status }}
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-500">
+                            Date: {{ a.date }} (Period {{ a.period_no }})
+                        </p>
+                        {% if a.reason %}
+                        <p class="text-[11px] text-slate-400 italic mt-0.5">Reason: "{{ a.reason }}"</p>
+                        {% endif %}
+                        <div class="mt-2.5 flex justify-end">
+                            <a href="/admin/absences" class="text-[11px] font-bold text-brand-600 hover:text-brand-700 flex items-center">
+                                Open Engine &rarr;
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-6 text-center text-xs text-slate-400">
+                        No recent absences recorded.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recently Completed Substitutions -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-navy-900 text-base">Recovered Classes</h3>
+                        <p class="text-xs text-slate-500">Confirmed substitutions</p>
+                    </div>
+                    <a href="/admin/substitutions" class="text-xs font-semibold text-brand-600 hover:text-brand-700">All</a>
+                </div>
+
+                <div class="divide-y divide-slate-100">
+                    {% for sub in recent_completed_subs %}
+                    <div class="p-4 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-emerald-700 flex items-center">
+                                <i data-lucide="check" class="w-3.5 h-3.5 mr-1 text-emerald-600"></i>
+                                {{ sub.substitute.name }}
+                            </span>
+                            <span class="text-[10px] font-mono text-slate-400">Match: {{ (sub.score * 100)|round|int }}%</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 mt-1">
+                            Covered <strong class="text-navy-900">{{ sub.timetable_entry.subject.name }}</strong> for {{ sub.absence.faculty.name }}
+                        </p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">
+                            {{ sub.absence.date }} &bull; Period {{ sub.absence.period_no }} &bull; Room {{ sub.room.name if sub.room else 'Standard Room' }}
+                        </p>
+                    </div>
+                    {% else %}
+                    <div class="p-6 text-center text-xs text-slate-400">
+                        No completed substitutions yet.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Faculty Workload Chart
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('workloadChart');
+        if (!ctx) return;
+
+        const labels = [{% for fw in faculty_workloads %}'{{ fw.name }}',{% endfor %}];
+        const data = [{% for fw in faculty_workloads %}{{ fw.sub_count }},{% endfor %}];
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Substitutions Completed This Month',
+                    data: data,
+                    backgroundColor: '#2563eb',
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#64748b', font: { family: 'Plus Jakarta Sans' } },
+                        grid: { color: '#f1f5f9' }
+                    },
+                    x: {
+                        ticks: { color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 10 } },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

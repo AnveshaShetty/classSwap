@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ClassSwap — Smart Substitutions. Zero Idle Hours.{% endblock %}</title>
+    
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617'
+                        },
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af'
+                        },
+                        tealAccent: {
+                            50: '#f0fdfa',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+
+    <!-- Global Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    {% if user and user.role == 'admin' %}
+    <!-- ADMIN SHELL: SIDEBAR + TOPBAR + MAIN -->
+    <div class="flex h-screen overflow-hidden bg-slate-50">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-navy-900 text-slate-300 flex flex-col flex-shrink-0 z-30 shadow-xl transition-all duration-300">
+            <!-- Brand / Logo -->
+            <div class="h-16 flex items-center px-6 bg-navy-950 border-b border-slate-800">
+                <a href="/admin/dashboard" class="flex items-center space-x-3 group">
+                    <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
+                        <i data-lucide="calendar-sync" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-lg font-bold text-white tracking-tight">Class<span class="text-brand-500">Swap</span></span>
+                        <span class="block text-[10px] text-tealAccent-500 font-semibold tracking-wider uppercase">Admin Portal</span>
+                    </div>
+                </a>
+            </div>
+
+            <!-- College Name Banner -->
+            <div class="px-5 py-3 border-b border-slate-800/80 bg-slate-900/40">
+                <p class="text-xs font-medium text-slate-400 truncate" title="{{ college_name }}">{{ college_name }}</p>
+                <p class="text-[11px] text-slate-500">{{ current_date }}</p>
+            </div>
+
+            <!-- Nav Links -->
+            <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto text-sm">
+                <a href="/admin/dashboard" class="flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium {% if active_page == 'dashboard' %}bg-brand-600 text-white shadow-sm{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 mr-3"></i>
+                    Dashboard
+                </a>
+                <a href="/admin/timetable" class="flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium {% if active_page == 'timetable' %}bg-brand-600 text-white shadow-sm{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="calendar" class="w-4 h-4 mr-3"></i>
+                    Timetable Management
+                </a>
+                <a href="/admin/absences" class="flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium {% if active_page == 'absences' %}bg-brand-600 text-white shadow-sm{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="user-x" class="w-4 h-4 mr-3"></i>
+                    Absence Management
+                </a>
+                <a href="/admin/substitutions" class="flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium {% if active_page == 'substitutions' %}bg-brand-600 text-white shadow-sm{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="arrow-left-right" class="w-4 h-4 mr-3"></i>
+                    Substitution Tracking
+                </a>
+                <a href="/admin/free-rooms" class="flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium {% if active_page == 'free_rooms' %}bg-brand-600 text-white shadow-sm{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="door-open" class="w-4 h-4 mr-3 text-tealAccent-500"></i>
+                    Free Room Finder
+                </a>
+
+                <div class="pt-3 pb-1 px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Academic Entities</div>
+
+                <a href="/admin/faculty" class="flex items-center px-3 py-2 rounded-lg transition-colors {% if active_page == 'faculty' %}bg-brand-600 text-white{% else %}text-slate-400 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="users" class="w-4 h-4 mr-3"></i>
+                    Faculty Management
+                </a>
+                <a href="/admin/subjects" class="flex items-center px-3 py-2 rounded-lg transition-colors {% if active_page == 'subjects' %}bg-brand-600 text-white{% else %}text-slate-400 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="book-open" class="w-4 h-4 mr-3"></i>
+                    Subjects
+                </a>
+                <a href="/admin/sections" class="flex items-center px-3 py-2 rounded-lg transition-colors {% if active_page == 'sections' %}bg-brand-600 text-white{% else %}text-slate-400 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="graduation-cap" class="w-4 h-4 mr-3"></i>
+                    Sections
+                </a>
+                <a href="/admin/rooms" class="flex items-center px-3 py-2 rounded-lg transition-colors {% if active_page == 'rooms' %}bg-brand-600 text-white{% else %}text-slate-400 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="building" class="w-4 h-4 mr-3"></i>
+                    Rooms & Labs
+                </a>
+
+                <div class="pt-3 pb-1 px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Reports & System</div>
+
+                <a href="/admin/reports" class="flex items-center px-3 py-2 rounded-lg transition-colors {% if active_page == 'reports' %}bg-brand-600 text-white{% else %}text-slate-400 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="file-bar-chart" class="w-4 h-4 mr-3"></i>
+                    Reports & Analytics
+                </a>
+                <a href="/admin/settings" class="flex items-center px-3 py-2 rounded-lg transition-colors {% if active_page == 'settings' %}bg-brand-600 text-white{% else %}text-slate-400 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i data-lucide="settings" class="w-4 h-4 mr-3"></i>
+                    Settings & Periods
+                </a>
+            </nav>
+
+            <!-- User Footer in Sidebar -->
+            <div class="p-3 border-t border-slate-800 bg-navy-950/80">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <div class="w-8 h-8 rounded-full bg-brand-700 text-white flex items-center justify-center font-bold text-xs uppercase flex-shrink-0">
+                            {{ user.name[:2] }}
+                        </div>
+                        <div class="truncate">
+                            <p class="text-xs font-semibold text-white truncate">{{ user.name }}</p>
+                            <p class="text-[11px] text-slate-400 truncate">{{ user.department }}</p>
+                        </div>
+                    </div>
+                    <a href="/logout" title="Sign Out" class="p-1.5 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Header -->
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-xl font-bold text-navy-900">{% block header_title %}Admin Console{% endblock %}</h1>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <!-- Demo Switcher Pill -->
+                    <div class="relative inline-block text-left" id="demo-switcher">
+                        <button type="button" onclick="toggleDemoMenu()" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 transition-colors">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-brand-600"></i>
+                            Switch Demo Account
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-1"></i>
+                        </button>
+                        <div id="demo-menu" class="hidden absolute right-0 mt-2 w-72 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 divide-y divide-slate-100 z-50">
+                            <div class="px-4 py-2 text-xs text-slate-500 font-semibold uppercase">Switch User Persona</div>
+                            <div class="py-1">
+                                <a href="javascript:void(0)" onclick="quickSwitchLogin('admin@classswap.edu', 'Admin@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                    <span class="w-2 h-2 rounded-full bg-brand-600 mr-2.5"></span>
+                                    <div>
+                                        <div class="font-bold">HOD Admin (Dr. Arvind Swaminathan)</div>
+                                        <div class="text-[10px] text-slate-500">Full college management & timetable override</div>
+                                    </div>
+                                </a>
+                                <a href="javascript:void(0)" onclick="quickSwitchLogin('rajesh.kumar@classswap.edu', 'Faculty@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                    <span class="w-2 h-2 rounded-full bg-teal-500 mr-2.5"></span>
+                                    <div>
+                                        <div class="font-bold">Dr. Rajesh Kumar (Faculty CSE)</div>
+                                        <div class="text-[10px] text-slate-500">Mark absent for Period 3 demo</div>
+                                    </div>
+                                </a>
+                                <a href="javascript:void(0)" onclick="quickSwitchLogin('priya.nair@classswap.edu', 'Faculty@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2.5"></span>
+                                    <div>
+                                        <div class="font-bold">Dr. Priya Nair (Faculty CSE)</div>
+                                        <div class="text-[10px] text-slate-500">Top ranked substitute (Fairness: 1.0)</div>
+                                    </div>
+                                </a>
+                                <a href="javascript:void(0)" onclick="quickSwitchLogin('anita.sharma@classswap.edu', 'Faculty@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 mr-2.5"></span>
+                                    <div>
+                                        <div class="font-bold">Dr. Anita Sharma (Faculty CSE)</div>
+                                        <div class="text-[10px] text-slate-500">Qualified faculty (1 sub completed)</div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct link to Public Landing -->
+                    <a href="/" target="_blank" class="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center">
+                        <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1"></i> Landing Page
+                    </a>
+                </div>
+            </header>
+
+            <!-- Scrollable Page Body -->
+            <main class="flex-1 overflow-y-auto p-8 bg-slate-50">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    {% elif user and user.role == 'faculty' %}
+    <!-- FACULTY SHELL: CLEAN TOPBAR + NAVIGATION PILLS + CONTENT -->
+    <header class="bg-navy-900 text-white shadow-md z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand -->
+                <div class="flex items-center space-x-3">
+                    <a href="/faculty/dashboard" class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold shadow-md shadow-brand-500/20">
+                            <i data-lucide="calendar-sync" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-lg font-bold text-white tracking-tight">Class<span class="text-brand-400">Swap</span></span>
+                            <span class="block text-[10px] text-tealAccent-400 font-semibold tracking-wider uppercase">Faculty Portal</span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="hidden md:flex space-x-1 text-sm font-medium">
+                    <a href="/faculty/dashboard" class="px-3 py-2 rounded-lg transition-colors {% if active_page == 'dashboard' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-navy-800 hover:text-white{% endif %}">
+                        Dashboard
+                    </a>
+                    <a href="/faculty/mark-absence" class="px-3 py-2 rounded-lg transition-colors {% if active_page == 'mark_absence' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-navy-800 hover:text-white{% endif %}">
+                        Mark Absence
+                    </a>
+                    <a href="/faculty/requests" class="px-3 py-2 rounded-lg transition-colors relative {% if active_page == 'requests' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-navy-800 hover:text-white{% endif %}">
+                        Substitution Requests
+                        {% if pending_requests_count > 0 %}
+                        <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-navy-950 rounded-full animate-pulse">{{ pending_requests_count }}</span>
+                        {% endif %}
+                    </a>
+                    <a href="/faculty/history" class="px-3 py-2 rounded-lg transition-colors {% if active_page == 'history' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-navy-800 hover:text-white{% endif %}">
+                        History & Workload
+                    </a>
+                </nav>
+
+                <!-- User actions & Demo Switcher -->
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="toggleDemoMenu()" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition-colors">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1 text-tealAccent-400"></i>
+                        Demo Switch
+                    </button>
+                    <div id="demo-menu" class="hidden absolute right-16 top-14 w-72 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 divide-y divide-slate-100 z-50 text-slate-800">
+                        <div class="px-4 py-2 text-xs text-slate-500 font-semibold uppercase">Switch User Persona</div>
+                        <div class="py-1">
+                            <a href="javascript:void(0)" onclick="quickSwitchLogin('admin@classswap.edu', 'Admin@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                <span class="w-2 h-2 rounded-full bg-brand-600 mr-2.5"></span>
+                                <div>
+                                    <div class="font-bold">HOD Admin (Dr. Arvind Swaminathan)</div>
+                                    <div class="text-[10px] text-slate-500">Manage all college timetables & absences</div>
+                                </div>
+                            </a>
+                            <a href="javascript:void(0)" onclick="quickSwitchLogin('rajesh.kumar@classswap.edu', 'Faculty@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                <span class="w-2 h-2 rounded-full bg-teal-500 mr-2.5"></span>
+                                <div>
+                                    <div class="font-bold">Dr. Rajesh Kumar (Faculty CSE)</div>
+                                    <div class="text-[10px] text-slate-500">Mark absent for Period 3 demo</div>
+                                </div>
+                            </a>
+                            <a href="javascript:void(0)" onclick="quickSwitchLogin('priya.nair@classswap.edu', 'Faculty@123')" class="flex items-center px-4 py-2 text-xs text-slate-700 hover:bg-brand-50">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2.5"></span>
+                                <div>
+                                    <div class="font-bold">Dr. Priya Nair (Faculty CSE)</div>
+                                    <div class="text-[10px] text-slate-500">Top candidate (Accept substitution)</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-semibold text-white leading-tight">{{ user.name }}</p>
+                        <p class="text-[10px] text-slate-400">{{ user.department }}</p>
+                    </div>
+
+                    <a href="/logout" title="Sign Out" class="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-navy-800 transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block faculty_content %}{% endblock %}
+    </main>
+
+    {% else %}
+    <!-- PUBLIC SHELL (LANDING / LOGIN) -->
+    <header class="sticky top-0 z-40 glass-nav border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="/" class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold shadow-md shadow-brand-500/25">
+                        <i data-lucide="calendar-sync" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xl font-extrabold text-navy-900 tracking-tight">Class<span class="text-brand-600">Swap</span></span>
+                        <span class="hidden sm:inline-block text-[11px] text-slate-500 ml-2 font-medium">Smart Substitutions. Zero Idle Hours.</span>
+                    </div>
+                </a>
+
+                <div class="flex items-center space-x-3">
+                    <a href="/#features" class="text-sm font-medium text-slate-600 hover:text-navy-900 hidden sm:block px-3 py-2">Features</a>
+                    <a href="/#how-it-works" class="text-sm font-medium text-slate-600 hover:text-navy-900 hidden sm:block px-3 py-2">How It Works</a>
+                    <a href="/#algorithm" class="text-sm font-medium text-slate-600 hover:text-navy-900 hidden sm:block px-3 py-2">Fairness Engine</a>
+                    <a href="/login" class="inline-flex items-center px-4 py-2 border border-brand-600 text-sm font-semibold rounded-lg text-brand-600 bg-white hover:bg-brand-50 shadow-sm transition-colors">
+                        Sign In
+                    </a>
+                    <a href="/login" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-brand-600 hover:bg-brand-700 shadow-sm transition-colors">
+                        Live Demo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1">
+        {% block public_content %}{% endblock %}
+    </main>
+
+    <!-- Public Footer -->
+    <footer class="bg-navy-900 text-slate-400 py-12 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold">
+                            <i data-lucide="calendar-sync" class="w-4 h-4"></i>
+                        </div>
+                        <span class="text-xl font-bold text-white tracking-tight">Class<span class="text-brand-500">Swap</span></span>
+                    </div>
+                    <p class="text-sm text-slate-400 max-w-sm mb-4">
+                        Intelligent college timetable and faculty substitution management platform. When a faculty member is absent, ClassSwap finds an available substitute and a suitable free classroom within seconds.
+                    </p>
+                    <p class="text-xs text-tealAccent-500 font-semibold uppercase tracking-wider">Smart Substitutions. Zero Idle Hours.</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-3">Platform</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="/login" class="hover:text-white transition-colors">HOD Dashboard</a></li>
+                        <li><a href="/login" class="hover:text-white transition-colors">Faculty Portal</a></li>
+                        <li><a href="/login" class="hover:text-white transition-colors">Recommendation Engine</a></li>
+                        <li><a href="/login" class="hover:text-white transition-colors">Free Classroom Finder</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-3">Demo Accounts</h4>
+                    <ul class="space-y-1.5 text-xs">
+                        <li class="text-slate-300 font-medium">Admin: <span class="text-brand-400">admin@classswap.edu</span></li>
+                        <li class="text-slate-300 font-medium">Faculty: <span class="text-tealAccent-400">rajesh.kumar@classswap.edu</span></li>
+                        <li class="text-slate-300 font-medium">Faculty: <span class="text-emerald-400">priya.nair@classswap.edu</span></li>
+                        <li class="text-slate-400 mt-2">Password: <code class="bg-navy-950 px-1 py-0.5 rounded text-slate-200">Admin@123 / Faculty@123</code></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="pt-8 border-t border-slate-800 text-xs text-center text-slate-500 flex flex-col sm:flex-row justify-between items-center">
+                <p>&copy; 2026 ClassSwap. Built for Hackathon Excellence & Real College Deployment.</p>
+                <p class="mt-2 sm:mt-0 text-slate-400">FastAPI &bull; SQLAlchemy 2.0 &bull; Tailwind CSS &bull; ReportLab PDF</p>
+            </div>
+        </div>
+    </footer>
+    {% endif %}
+
+    <!-- Helper JavaScript: Toast Notifications, Demo Switcher, Lucide Init -->
+    <script>
+        // Initialize Lucide Icons
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        // Toggle Demo Menu Dropdown
+        function toggleDemoMenu() {
+            const menu = document.getElementById('demo-menu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        // Close demo menu when clicking outside
+        window.addEventListener('click', function(e) {
+            const switcher = document.getElementById('demo-switcher');
+            const menu = document.getElementById('demo-menu');
+            if (switcher && !switcher.contains(e.target) && menu && !menu.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // Quick Switch Login Function (AJAX login & reload)
+        async function quickSwitchLogin(email, password) {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(`Logged in as ${data.name}`, 'success');
+                    setTimeout(() => {
+                        window.location.href = (data.role === 'admin') ? '/admin/dashboard' : '/faculty/dashboard';
+                    }, 400);
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || 'Login failed', 'error');
+                }
+            } catch (err) {
+                showToast('Network error during quick switch', 'error');
+            }
+        }
+
+        // Global Toast Notification
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600 text-white' : (type === 'error' ? 'bg-red-600 text-white' : 'bg-navy-900 text-white');
+            
+            toast.className = `px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 text-sm font-medium transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgClass}`;
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white ml-2 text-xs">&times;</button>
+            `;
+            container.appendChild(toast);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+            
+            // Auto dismiss after 4 seconds
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}Faculty Absence & Recommendations — ClassSwap{% endblock %}
+{% block header_title %}Faculty Absence Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header Controls -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-bold text-navy-900">Faculty Absence Tracking & Recommendations</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Report faculty leaves, inspect affected classes, and activate the multi-factor recommendation engine.</p>
+        </div>
+        <div>
+            <button onclick="openModal('markAbsenceModal')" class="inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-sm shadow-red-600/20 transition-all">
+                <i data-lucide="user-x" class="w-3.5 h-3.5 mr-1.5"></i> Mark Faculty Absent
+            </button>
+        </div>
+    </div>
+
+    <!-- ABSENCES TABLE -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-xs text-left">
+                <thead class="bg-slate-50 text-slate-600 uppercase tracking-wider font-semibold">
+                    <tr>
+                        <th class="px-5 py-3.5">Faculty Member</th>
+                        <th class="px-5 py-3.5">Date & Period</th>
+                        <th class="px-5 py-3.5">Affected Class</th>
+                        <th class="px-5 py-3.5">Reason</th>
+                        <th class="px-5 py-3.5">Status</th>
+                        <th class="px-5 py-3.5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in absence_details %}
+                    {% set a = item.absence %}
+                    {% set tt = item.timetable %}
+                    {% set sub = item.active_substitution %}
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                        <td class="px-5 py-4">
+                            <div class="font-bold text-navy-900">{{ a.faculty.name }}</div>
+                            <div class="text-[11px] text-slate-500">{{ a.faculty.department }}</div>
+                        </td>
+                        <td class="px-5 py-4">
+                            <div class="font-semibold text-slate-800">{{ a.date }}</div>
+                            <div class="text-[11px] text-brand-600 font-bold">Period {{ a.period_no }}</div>
+                        </td>
+                        <td class="px-5 py-4">
+                            {% if tt %}
+                            <div class="font-semibold text-slate-900">{{ tt.subject.name }}</div>
+                            <div class="text-[11px] text-slate-500">{{ tt.section.name }} &bull; {{ tt.room.name }}</div>
+                            {% else %}
+                            <span class="text-slate-400 italic">No scheduled class in master timetable</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-4 text-slate-600 max-w-xs truncate">
+                            {{ a.reason or "No reason specified" }}
+                        </td>
+                        <td class="px-5 py-4">
+                            {% if a.status == 'Substitution Arranged' %}
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                Arranged: {{ sub.substitute.name if sub else 'Substitute' }}
+                            </span>
+                            {% elif a.status == 'Processing' %}
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                Pending Approval
+                            </span>
+                            {% else %}
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">
+                                Pending Substitute
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-4 text-right space-x-2">
+                            {% if tt and a.status != 'Substitution Arranged' %}
+                            <button onclick="openRecommendationEngine({{ a.id }})" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 shadow-sm transition-all">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1 text-tealAccent-300"></i> Find Substitutes
+                            </button>
+                            {% elif a.status == 'Substitution Arranged' %}
+                            <a href="/admin/substitutions" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200">
+                                View Swap
+                            </a>
+                            {% endif %}
+                            <button onclick="cancelAbsence({{ a.id }})" title="Cancel absence" class="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-5 py-10 text-center text-slate-400 text-xs">
+                            No faculty absences recorded.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: MARK FACULTY ABSENT -->
+<div id="markAbsenceModal" class="hidden fixed inset-0 z-50 overflow-y-auto modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <h3 class="text-base font-bold text-navy-900">Mark Faculty Absent</h3>
+            <button onclick="closeModal('markAbsenceModal')" class="text-slate-400 hover:text-slate-600">&times;</button>
+        </div>
+
+        <form id="markAbsenceForm" onsubmit="submitMarkAbsence(event)" class="mt-4 space-y-3.5 text-xs">
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Select Faculty</label>
+                <select id="abs_faculty_id" required class="w-full border border-slate-300 rounded-xl px-3 py-2 bg-slate-50">
+                    {% for fac in faculties %}
+                    <option value="{{ fac.id }}">{{ fac.name }} ({{ fac.department }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Absence Date</label>
+                <input type="date" id="abs_date" value="{{ today_iso }}" required class="w-full border border-slate-300 rounded-xl px-3 py-2 bg-slate-50">
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Select Period(s)</label>
+                <div class="grid grid-cols-3 gap-2">
+                    {% for p in periods %}
+                    <label class="flex items-center p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                        <input type="checkbox" name="period_nos" value="{{ p.period_no }}" class="h-4 w-4 text-brand-600 border-slate-300 rounded" {% if p.period_no == 3 %}checked{% endif %}>
+                        <span class="ml-2 font-semibold">P{{ p.period_no }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Optional Reason</label>
+                <input type="text" id="abs_reason" placeholder="e.g. Attending Conference, Medical Leave" class="w-full border border-slate-300 rounded-xl px-3 py-2 bg-slate-50">
+            </div>
+
+            <div class="pt-4 flex justify-end space-x-2">
+                <button type="button" onclick="closeModal('markAbsenceModal')" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-semibold hover:bg-slate-200">Cancel</button>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-sm">Record Absence</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: INTELLIGENT SUBSTITUTE RECOMMENDATION ENGINE -->
+<div id="recModal" class="hidden fixed inset-0 z-50 overflow-y-auto modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200">
+        <!-- Header -->
+        <div class="flex items-start justify-between pb-5 border-b border-slate-100">
+            <div>
+                <div class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 text-[11px] font-bold uppercase tracking-wider mb-1">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-600"></i>
+                    <span>Multi-Factor Recommendation Engine</span>
+                </div>
+                <h3 class="text-xl font-extrabold text-navy-900" id="recSubjectTitle">Calculating Substitutes...</h3>
+                <p class="text-xs text-slate-500 mt-0.5" id="recClassSubtitle"></p>
+            </div>
+            <button onclick="closeModal('recModal')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+        </div>
+
+        <div class="mt-6 space-y-6 text-xs">
+            <!-- STEP 2: TOP 3 RANKED FACULTY CANDIDATES -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-extrabold text-navy-900 uppercase tracking-wider text-xs flex items-center">
+                        <i data-lucide="users" class="w-4 h-4 mr-1.5 text-brand-600"></i>
+                        Top Eligible Substitute Candidates (Ranked)
+                    </h4>
+                    <span class="text-[11px] text-slate-400 font-mono">Formula: 0.5 &times; Subj + 0.3 &times; Fair + 0.2 &times; Dept</span>
+                </div>
+
+                <div id="candidatesList" class="space-y-3">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- STEP 3: FREE CLASSROOM / LAB ALLOCATION -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-extrabold text-navy-900 uppercase tracking-wider text-xs flex items-center">
+                        <i data-lucide="door-open" class="w-4 h-4 mr-1.5 text-tealAccent-600"></i>
+                        Classroom Availability Engine (Free Rooms)
+                    </h4>
+                    <span class="text-[11px] text-slate-400 font-mono">Capacity & Type Verified</span>
+                </div>
+
+                <div id="roomsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Action footer -->
+            <div class="pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="text-[11px] text-slate-500">
+                    Selected Substitute: <strong id="selectedSubstituteName" class="text-navy-900">—</strong> | 
+                    Room: <strong id="selectedRoomName" class="text-tealAccent-600">—</strong>
+                </div>
+                <div class="flex space-x-2">
+                    <button type="button" onclick="closeModal('recModal')" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-semibold hover:bg-slate-200">Close</button>
+                    <button id="sendRequestBtn" type="button" onclick="sendSubstitutionRequest()" disabled class="px-5 py-2 rounded-xl bg-brand-600 text-white font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-500/20">
+                        <i data-lucide="send" class="w-3.5 h-3.5 mr-1 inline"></i> Send Substitution Request
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentAbsenceId = null;
+    let selectedCandidateId = null;
+    let selectedRoomId = null;
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        lucide.createIcons();
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+    }
+
+    // Mark Absence submission
+    async function submitMarkAbsence(e) {
+        e.preventDefault();
+        const facId = parseInt(document.getElementById('abs_faculty_id').value);
+        const dateVal = document.getElementById('abs_date').value;
+        const reasonVal = document.getElementById('abs_reason').value;
+        
+        const periodCheckboxes = document.querySelectorAll('input[name="period_nos"]:checked');
+        const periods = Array.from(periodCheckboxes).map(cb => parseInt(cb.value));
+
+        if (!periods.length) {
+            showToast('Please select at least one period.', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/absences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    faculty_id: facId,
+                    date: dateVal,
+                    period_nos: periods,
+                    reason: reasonVal
+                })
+            });
+
+            if (res.ok) {
+                const absences = await res.json();
+                showToast(`Absence recorded for ${absences.length} period(s)!`, 'success');
+                setTimeout(() => window.location.reload(), 600);
+            } else {
+                const err = await res.json();
+                showToast(err.detail || 'Failed to submit absence', 'error');
+            }
+        } catch (err) {
+            showToast('Network error submitting absence', 'error');
+        }
+    }
+
+    // Cancel Absence
+    async function cancelAbsence(id) {
+        if (!confirm('Cancel this absence?')) return;
+        try {
+            const res = await fetch(`/api/absences/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('Absence cancelled', 'info');
+                setTimeout(() => window.location.reload(), 400);
+            } else {
+                showToast('Failed to cancel', 'error');
+            }
+        } catch (err) {
+            showToast('Network error', 'error');
+        }
+    }
+
+    // OPEN THE RECOMMENDATION ENGINE
+    async function openRecommendationEngine(absenceId) {
+        currentAbsenceId = absenceId;
+        selectedCandidateId = null;
+        selectedRoomId = null;
+        document.getElementById('sendRequestBtn').disabled = true;
+        document.getElementById('selectedSubstituteName').innerText = '—';
+        document.getElementById('selectedRoomName').innerText = '—';
+
+        openModal('recModal');
+        document.getElementById('recSubjectTitle').innerText = 'Running Recommendation Algorithm...';
+
+        try {
+            const res = await fetch(`/api/absences/${absenceId}/recommendations`);
+            if (!res.ok) {
+                const err = await res.json();
+                showToast(err.detail || 'Could not fetch recommendations', 'error');
+                closeModal('recModal');
+                return;
+            }
+
+            const data = await res.json();
+            
+            // Populate Header
+            document.getElementById('recSubjectTitle').innerText = `${data.subject_name} (${data.subject_code})`;
+            document.getElementById('recClassSubtitle').innerText = `Section: ${data.section_name} (${data.section_strength} Students) • Date: ${data.date} • Period ${data.period_no} • Original Room: ${data.current_room_name}`;
+
+            // Populate Candidates
+            const candList = document.getElementById('candidatesList');
+            candList.innerHTML = '';
+
+            if (!data.candidates.length) {
+                candList.innerHTML = `<div class="p-4 rounded-xl bg-red-50 text-red-700 text-center">No available faculty members found for this slot. All faculty are busy or committed.</div>`;
+            } else {
+                data.candidates.forEach((c, idx) => {
+                    const isTop = idx === 0;
+                    const card = document.createElement('div');
+                    card.className = `p-4 rounded-2xl border cursor-pointer transition-all ${isTop ? 'bg-brand-50/50 border-brand-500 shadow-sm' : 'bg-white border-slate-200 hover:border-brand-300'}`;
+                    card.onclick = () => selectCandidate(c.faculty_id, c.faculty_name, card);
+
+                    const matchScorePct = Math.round(c.final_score * 100);
+
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 rounded-full ${isTop ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-700'} font-bold flex items-center justify-center text-xs">
+                                    #${idx + 1}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-navy-900 text-sm flex items-center">
+                                        ${c.faculty_name}
+                                        ${isTop ? '<span class="ml-2 text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded-full font-bold">Top Choice</span>' : ''}
+                                    </div>
+                                    <div class="text-[11px] text-slate-500">${c.department} &bull; ${c.email}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-base font-extrabold text-brand-600 font-mono">${matchScorePct}% Match</div>
+                                <div class="text-[10px] text-slate-400 font-mono">Score: ${c.final_score} / 1.0</div>
+                            </div>
+                        </div>
+
+                        <!-- Score Component Breakdown -->
+                        <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px]">
+                            <div class="p-2 rounded-lg bg-slate-50">
+                                <span class="text-slate-400 block text-[10px]">Subject Match (50%)</span>
+                                <strong class="text-navy-900">${(c.subject_match * 100)|0}% (${c.subject_match >= 1.0 ? 'Exact Qual.' : (c.subject_match > 0 ? 'Related Area' : 'None')})</strong>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-50">
+                                <span class="text-slate-400 block text-[10px]">Fairness Score (30%)</span>
+                                <strong class="text-navy-900">${(c.fairness_score * 100)|0}% (${c.monthly_substitutions} completed)</strong>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-50">
+                                <span class="text-slate-400 block text-[10px]">Dept Match (20%)</span>
+                                <strong class="text-navy-900">${(c.dept_match * 100)|0}% (${c.dept_match === 1.0 ? 'Same Dept' : 'Other'})</strong>
+                            </div>
+                        </div>
+                    `;
+                    candList.appendChild(card);
+
+                    // Auto-select top candidate by default
+                    if (isTop) {
+                        selectCandidate(c.faculty_id, c.faculty_name, card);
+                    }
+                });
+            }
+
+            // Populate Free Rooms
+            const roomsList = document.getElementById('roomsList');
+            roomsList.innerHTML = '';
+
+            data.suitable_rooms.forEach((r, idx) => {
+                const isBest = idx === 0;
+                const rCard = document.createElement('div');
+                rCard.className = `p-3 rounded-xl border cursor-pointer transition-all ${isBest ? 'bg-teal-50/60 border-tealAccent-500' : 'bg-white border-slate-200 hover:border-tealAccent-300'}`;
+                rCard.onclick = () => selectRoom(r.room_id, r.room_name, rCard);
+
+                rCard.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <strong class="text-navy-900 text-xs">${r.room_name} (${r.room_type})</strong>
+                        <span class="text-[10px] px-2 py-0.5 rounded ${isBest ? 'bg-tealAccent-600 text-white font-bold' : 'bg-slate-100 text-slate-600'}">
+                            ${isBest ? 'Best Fit' : 'Available'}
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-600 mt-1">${r.capacity} Seats (Class strength: ${r.section_strength})</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">${r.building}</p>
+                `;
+                roomsList.appendChild(rCard);
+
+                if (isBest) {
+                    selectRoom(r.room_id, r.room_name, rCard);
+                }
+            });
+
+            lucide.createIcons();
+
+        } catch (err) {
+            showToast('Error loading recommendations', 'error');
+        }
+    }
+
+    function selectCandidate(id, name, el) {
+        selectedCandidateId = id;
+        document.getElementById('selectedSubstituteName').innerText = name;
+        document.querySelectorAll('#candidatesList > div').forEach(d => {
+            d.classList.remove('ring-2', 'ring-brand-600');
+        });
+        el.classList.add('ring-2', 'ring-brand-600');
+        checkCanSend();
+    }
+
+    function selectRoom(id, name, el) {
+        selectedRoomId = id;
+        document.getElementById('selectedRoomName').innerText = name;
+        document.querySelectorAll('#roomsList > div').forEach(d => {
+            d.classList.remove('ring-2', 'ring-tealAccent-600');
+        });
+        el.classList.add('ring-2', 'ring-tealAccent-600');
+        checkCanSend();
+    }
+
+    function checkCanSend() {
+        if (selectedCandidateId && currentAbsenceId) {
+            document.getElementById('sendRequestBtn').disabled = false;
+        }
+    }
+
+    // SEND SUBSTITUTION REQUEST
+    async function sendSubstitutionRequest() {
+        if (!currentAbsenceId || !selectedCandidateId) return;
+
+        try {
+            const res = await fetch('/api/substitutions/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    absence_id: currentAbsenceId,
+                    substitute_id: selectedCandidateId,
+                    room_id: selectedRoomId,
+                    notes: "Substitution requested via ClassSwap Intelligent Engine"
+                })
+            });
+
+            if (res.ok) {
+                const sub = await res.json();
+                showToast(`Substitution request sent to ${sub.substitute_name}!`, 'success');
+                closeModal('recModal');
+                setTimeout(() => window.location.reload(), 600);
+            } else {
+                const err = await res.json();
+                showToast(err.detail || 'Failed to send request', 'error');
+            }
+        } catch (err) {
+            showToast('Network error sending substitution request', 'error');
+        }
+    }
+</script>
+{% endblock %}
