@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weekly timetable · ClassSwap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="mb-6">
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">ClassSwap</p>
+      <h1 class="mt-1 text-3xl font-bold tracking-tight">Weekly timetable</h1>
+      <p class="mt-2 text-slate-600">Choose a section or faculty member. Accepted cover is marked for the selected date.</p>
+    </header>
+
+    <form class="mb-6 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4"
+          method="get" action="/timetable" hx-get="/timetable" hx-trigger="change, submit"
+          hx-target="#timetable-grid" hx-select="#timetable-grid" hx-swap="outerHTML">
+      <label class="text-sm font-medium">
+        Section
+        <select name="section" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+          <option value="">All sections</option>
+          {% for section in sections %}
+          <option value="{{ section.name }}" {% if selected_section == section.name %}selected{% endif %}>
+            {{ section.name }} · semester {{ section.semester }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="text-sm font-medium">
+        Faculty
+        <select name="faculty" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+          <option value="">All faculty</option>
+          {% for person in faculty %}
+          <option value="{{ person.email }}" {% if selected_faculty == person.email %}selected{% endif %}>
+            {{ person.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="text-sm font-medium">
+        Coverage date
+        <input type="date" name="date" value="{{ selected_date.isoformat() }}"
+               class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+      </label>
+      <div class="flex items-end">
+        <button class="w-full rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800"
+                type="submit">Show timetable</button>
+      </div>
+    </form>
+
+    {% if current_user.role in ["hod", "super_admin"] %}
+    <section class="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold">Import timetable CSV</h2>
+      <p class="mt-1 text-sm text-slate-600">
+        Required columns: section, day, period, subject, faculty_email, room.
+      </p>
+      <form id="timetable-import-form" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label class="flex-1 text-sm font-medium">
+          CSV file
+          <input required type="file" name="file" accept=".csv,text/csv"
+                 class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2">
+        </label>
+        <button type="submit"
+                class="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-700">
+          Validate and import
+        </button>
+      </form>
+      <div id="import-result" class="mt-3 text-sm" role="status" aria-live="polite"></div>
+    </section>
+    {% endif %}
+
+    <section id="timetable-grid" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-[900px] w-full border-collapse text-sm">
+          <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+              <th class="sticky left-0 z-10 min-w-20 bg-slate-100 px-3 py-3">Day</th>
+              {% for period in range(1, 8) %}
+              <th class="min-w-32 px-3 py-3">Period {{ period }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for day in days %}
+            <tr class="border-t border-slate-200 align-top">
+              <th class="sticky left-0 bg-white px-3 py-3 font-semibold">{{ day.name }}</th>
+              {% for period in day.periods %}
+              <td class="border-l border-slate-100 p-2">
+                {% for entry in period.entries %}
+                <article data-section="{{ entry.section }}"
+                         class="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2 last:mb-0">
+                  <p class="font-semibold">{{ entry.subject }}</p>
+                  <p class="mt-1 text-xs text-slate-600">{{ entry.section }} · {{ entry.faculty }}</p>
+                  <p class="text-xs text-slate-500">{{ entry.room }}</p>
+                  {% if entry.substituted %}
+                  <span class="mt-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                    Substitute accepted
+                  </span>
+                  {% endif %}
+                </article>
+                {% endfor %}
+              </td>
+              {% endfor %}
+              {% for _ in range(7 - day.periods|length) %}
+              <td class="border-l border-slate-100 bg-slate-50/60"></td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+        Periods beyond Saturday's schedule are intentionally blank.
+      </p>
+    </section>
+  </main>
+  {% if current_user.role in ["hod", "super_admin"] %}
+  <script>
+    const importForm = document.getElementById("timetable-import-form");
+    const importResult = document.getElementById("import-result");
+    importForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      importResult.replaceChildren();
+      try {
+        const response = await fetch("/timetable/import", {
+          method: "POST",
+          body: new FormData(importForm),
+          credentials: "same-origin"
+        });
+        const result = await response.json();
+        if (response.ok) {
+          importResult.textContent = `Imported ${result.imported_rows} timetable rows.`;
+          importResult.className = "mt-3 text-sm font-medium text-emerald-700";
+          return;
+        }
+        const heading = document.createElement("p");
+        heading.textContent = result.detail?.message || "The timetable could not be imported.";
+        importResult.append(heading);
+        for (const error of result.detail?.errors || []) {
+          const item = document.createElement("p");
+          item.textContent = `Row ${error.row}: ${error.message}`;
+          importResult.append(item);
+        }
+        importResult.className = "mt-3 text-sm text-rose-700";
+      } catch {
+        importResult.textContent = "The upload failed. Please try again.";
+        importResult.className = "mt-3 text-sm text-rose-700";
+      }
+    });
+  </script>
+  {% endif %}
+</body>
+</html>
