@@ -1,0 +1,39 @@
+faculty_email,semester,section,subject
+arjun.kulkarni@demo.edu,3,3A,Data Structures and Algorithms
+kavya.menon@demo.edu,3,3A,Computer Organization and Architecture
+ravi.kulal@demo.edu,3,3A,Object-Oriented Programming
+leela.srinivasan@demo.edu,3,3A,Discrete Mathematics
+aditya.joshi@demo.edu,3,3A,Web Technologies
+nisha.reddy@demo.edu,3,3A,Engineering Communication
+arjun.kulkarni@demo.edu,3,3A,Data Structures Laboratory
+kavya.menon@demo.edu,3,3A,Digital Systems Laboratory
+arjun.kulkarni@demo.edu,3,3B,Data Structures and Algorithms
+kavya.menon@demo.edu,3,3B,Computer Organization and Architecture
+ravi.kulal@demo.edu,3,3B,Object-Oriented Programming
+leela.srinivasan@demo.edu,3,3B,Discrete Mathematics
+aditya.joshi@demo.edu,3,3B,Web Technologies
+nisha.reddy@demo.edu,3,3B,Engineering Communication
+arjun.kulkarni@demo.edu,3,3B,Data Structures Laboratory
+kavya.menon@demo.edu,3,3B,Digital Systems Laboratory
+meera.iyer@demo.edu,5,5A,Operating Systems
+rohan.desai@demo.edu,5,5A,Database Management Systems
+rohan.desai@demo.edu,5,5A,Computer Networks
+nisha.reddy@demo.edu,5,5A,Theory of Computation
+meera.shenoy@demo.edu,5,5A,Software Engineering
+leela.srinivasan@demo.edu,5,5A,Probability and Statistics
+meera.iyer@demo.edu,5,5A,Operating Systems Laboratory
+sanjana.pillai@demo.edu,5,5A,Database and Networks Laboratory
+meera.iyer@demo.edu,5,5B,Operating Systems
+rohan.desai@demo.edu,5,5B,Database Management Systems
+rohan.desai@demo.edu,5,5B,Computer Networks
+nisha.reddy@demo.edu,5,5B,Theory of Computation
+meera.shenoy@demo.edu,5,5B,Software Engineering
+leela.srinivasan@demo.edu,5,5B,Probability and Statistics
+meera.iyer@demo.edu,5,5B,Operating Systems Laboratory
+sanjana.pillai@demo.edu,5,5B,Database and Networks Laboratory
+tara.banerjee@demo.edu,7,7A,Machine Learning
+vivek.nair@demo.edu,7,7A,Cloud Computing
+vivek.nair@demo.edu,7,7A,Distributed Systems
+tara.banerjee@demo.edu,7,7A,Cybersecurity Fundamentals
+meera.shenoy@demo.edu,7,7A,Entrepreneurship in Computing
+vivek.nair@demo.edu,7,7A,Capstone Design Project

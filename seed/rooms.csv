@@ -1,0 +1,13 @@
+name,type,capacity
+CSD-3A,class,60
+CSD-3B,class,60
+CSD-5A,class,60
+CSD-5B,class,60
+CSD-7A,class,60
+Seminar-201,class,70
+Tutorial-104,class,40
+Main-Seminar-Hall,class,120
+CSD-Lab-1,lab,60
+CSD-Lab-2,lab,60
+CSD-Lab-3,lab,60
+CSD-Lab-4,lab,60

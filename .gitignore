@@ -1,27 +1,13 @@
-# Python
+.env
+.venv/
+venv/
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-ENV/
-
-# Database
+.pytest_cache/
+.coverage
+htmlcov/
 *.db
 *.sqlite3
-
-# Reports
-reports/*.pdf
-reports/*.csv
-
-# IDE & OS
-.vscode/
 .idea/
-.DS_Store
+.vscode/
 Thumbs.db
-
-# Environment variables
-.env

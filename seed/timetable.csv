@@ -1,0 +1,120 @@
+section,day,period,subject,faculty_email,room
+3A,Mon,1,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3A
+3B,Mon,1,Discrete Mathematics,leela.srinivasan@demo.edu,CSD-3B
+5A,Mon,1,Operating Systems,meera.iyer@demo.edu,CSD-5A
+5B,Mon,1,Computer Networks,rohan.desai@demo.edu,CSD-5B
+7A,Mon,1,Distributed Systems,vivek.nair@demo.edu,CSD-7A
+3A,Mon,2,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-3A
+3B,Mon,2,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3B
+5A,Mon,2,Theory of Computation,nisha.reddy@demo.edu,Seminar-201
+5B,Mon,2,Database Management Systems,rohan.desai@demo.edu,CSD-5B
+7A,Mon,2,Cloud Computing,vivek.nair@demo.edu,CSD-7A
+3A,Mon,3,Object-Oriented Programming,ravi.kulal@demo.edu,CSD-3A
+3B,Mon,3,Engineering Communication,nisha.reddy@demo.edu,Seminar-201
+5A,Mon,3,Database Management Systems,rohan.desai@demo.edu,CSD-5A
+5B,Mon,3,Operating Systems,meera.iyer@demo.edu,CSD-5B
+3A,Mon,4,Web Technologies,aditya.joshi@demo.edu,Main-Seminar-Hall
+3B,Mon,4,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-3B
+5A,Mon,4,Software Engineering,meera.shenoy@demo.edu,CSD-5A
+5B,Mon,4,Probability and Statistics,leela.srinivasan@demo.edu,CSD-5B
+7A,Mon,4,Machine Learning,tara.banerjee@demo.edu,CSD-7A
+3B,Tue,1,Computer Organization and Architecture,kavya.menon@demo.edu,Main-Seminar-Hall
+5A,Tue,1,Database Management Systems,rohan.desai@demo.edu,CSD-5A
+5B,Tue,1,Theory of Computation,nisha.reddy@demo.edu,CSD-5B
+7A,Tue,1,Entrepreneurship in Computing,meera.shenoy@demo.edu,CSD-7A
+3B,Tue,2,Data Structures and Algorithms,arjun.kulkarni@demo.edu,Seminar-201
+5A,Tue,2,Computer Networks,rohan.desai@demo.edu,CSD-5A
+7A,Tue,2,Machine Learning,tara.banerjee@demo.edu,CSD-7A
+3B,Tue,3,Discrete Mathematics,leela.srinivasan@demo.edu,CSD-3B
+5A,Tue,3,Theory of Computation,nisha.reddy@demo.edu,Seminar-201
+7A,Tue,3,Cloud Computing,vivek.nair@demo.edu,CSD-7A
+3A,Tue,4,Object-Oriented Programming,ravi.kulal@demo.edu,CSD-3A
+3B,Tue,4,Web Technologies,aditya.joshi@demo.edu,CSD-3B
+5A,Tue,4,Operating Systems,meera.iyer@demo.edu,CSD-5A
+7A,Tue,4,Cybersecurity Fundamentals,tara.banerjee@demo.edu,CSD-7A
+3A,Tue,5,Data Structures Laboratory,arjun.kulkarni@demo.edu,CSD-Lab-4
+5B,Tue,5,Database and Networks Laboratory,sanjana.pillai@demo.edu,CSD-Lab-2
+3A,Tue,6,Data Structures Laboratory,arjun.kulkarni@demo.edu,CSD-Lab-4
+5B,Tue,6,Database and Networks Laboratory,sanjana.pillai@demo.edu,CSD-Lab-2
+3A,Tue,7,Data Structures Laboratory,arjun.kulkarni@demo.edu,CSD-Lab-4
+5B,Tue,7,Database and Networks Laboratory,sanjana.pillai@demo.edu,CSD-Lab-2
+3A,Wed,1,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-3A
+5B,Wed,1,Theory of Computation,nisha.reddy@demo.edu,Seminar-201
+7A,Wed,1,Entrepreneurship in Computing,meera.shenoy@demo.edu,CSD-7A
+3A,Wed,2,Discrete Mathematics,leela.srinivasan@demo.edu,CSD-3A
+5A,Wed,2,Computer Networks,rohan.desai@demo.edu,CSD-5A
+3A,Wed,3,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3B
+3A,Wed,4,Engineering Communication,nisha.reddy@demo.edu,CSD-7A
+3B,Wed,4,Object-Oriented Programming,ravi.kulal@demo.edu,CSD-3B
+5B,Wed,4,Probability and Statistics,leela.srinivasan@demo.edu,CSD-5B
+3B,Wed,5,Data Structures Laboratory,arjun.kulkarni@demo.edu,CSD-Lab-3
+5A,Wed,5,Database and Networks Laboratory,sanjana.pillai@demo.edu,CSD-Lab-2
+5B,Wed,5,Operating Systems Laboratory,meera.iyer@demo.edu,CSD-Lab-1
+7A,Wed,5,Capstone Design Project,vivek.nair@demo.edu,CSD-7A
+3B,Wed,6,Data Structures Laboratory,arjun.kulkarni@demo.edu,CSD-Lab-3
+5A,Wed,6,Database and Networks Laboratory,sanjana.pillai@demo.edu,CSD-Lab-2
+5B,Wed,6,Operating Systems Laboratory,meera.iyer@demo.edu,CSD-Lab-1
+7A,Wed,6,Capstone Design Project,vivek.nair@demo.edu,CSD-7A
+3B,Wed,7,Data Structures Laboratory,arjun.kulkarni@demo.edu,CSD-Lab-3
+5A,Wed,7,Database and Networks Laboratory,sanjana.pillai@demo.edu,CSD-Lab-2
+5B,Wed,7,Operating Systems Laboratory,meera.iyer@demo.edu,CSD-Lab-1
+7A,Wed,7,Capstone Design Project,vivek.nair@demo.edu,CSD-7A
+3A,Thu,1,Discrete Mathematics,leela.srinivasan@demo.edu,CSD-3A
+3B,Thu,1,Object-Oriented Programming,ravi.kulal@demo.edu,CSD-3B
+5A,Thu,1,Software Engineering,meera.shenoy@demo.edu,CSD-5A
+5B,Thu,1,Database Management Systems,rohan.desai@demo.edu,Main-Seminar-Hall
+3A,Thu,2,Object-Oriented Programming,ravi.kulal@demo.edu,Seminar-201
+5A,Thu,2,Operating Systems,meera.iyer@demo.edu,CSD-5A
+5B,Thu,2,Software Engineering,meera.shenoy@demo.edu,CSD-5B
+7A,Thu,2,Machine Learning,tara.banerjee@demo.edu,CSD-7A
+3A,Thu,3,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-5B
+5A,Thu,3,Database Management Systems,rohan.desai@demo.edu,CSD-7A
+5B,Thu,3,Theory of Computation,nisha.reddy@demo.edu,Main-Seminar-Hall
+7A,Thu,3,Cloud Computing,vivek.nair@demo.edu,CSD-3B
+3A,Thu,4,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3A
+3B,Thu,4,Engineering Communication,nisha.reddy@demo.edu,CSD-3B
+5A,Thu,4,Computer Networks,rohan.desai@demo.edu,CSD-5A
+5B,Thu,4,Operating Systems,meera.iyer@demo.edu,CSD-5B
+3B,Thu,5,Digital Systems Laboratory,kavya.menon@demo.edu,CSD-Lab-1
+3B,Thu,6,Digital Systems Laboratory,kavya.menon@demo.edu,CSD-Lab-1
+3B,Thu,7,Digital Systems Laboratory,kavya.menon@demo.edu,CSD-Lab-1
+3A,Fri,1,Web Technologies,aditya.joshi@demo.edu,CSD-5A
+3B,Fri,1,Discrete Mathematics,leela.srinivasan@demo.edu,Seminar-201
+5B,Fri,1,Database Management Systems,rohan.desai@demo.edu,CSD-5B
+7A,Fri,1,Cybersecurity Fundamentals,tara.banerjee@demo.edu,CSD-7A
+3A,Fri,2,Engineering Communication,nisha.reddy@demo.edu,CSD-3A
+3B,Fri,2,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3B
+5A,Fri,2,Software Engineering,meera.shenoy@demo.edu,CSD-5A
+5B,Fri,2,Operating Systems,meera.iyer@demo.edu,CSD-5B
+3B,Fri,3,Web Technologies,aditya.joshi@demo.edu,CSD-5A
+5B,Fri,3,Computer Networks,rohan.desai@demo.edu,CSD-5B
+7A,Fri,3,Cloud Computing,vivek.nair@demo.edu,CSD-7A
+3B,Fri,4,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-3B
+5A,Fri,4,Probability and Statistics,leela.srinivasan@demo.edu,CSD-5A
+5B,Fri,4,Software Engineering,meera.shenoy@demo.edu,CSD-7A
+7A,Fri,4,Distributed Systems,vivek.nair@demo.edu,Seminar-201
+3A,Fri,5,Digital Systems Laboratory,kavya.menon@demo.edu,CSD-Lab-3
+5A,Fri,5,Operating Systems Laboratory,meera.iyer@demo.edu,CSD-Lab-1
+3A,Fri,6,Digital Systems Laboratory,kavya.menon@demo.edu,CSD-Lab-3
+5A,Fri,6,Operating Systems Laboratory,meera.iyer@demo.edu,CSD-Lab-1
+3A,Fri,7,Digital Systems Laboratory,kavya.menon@demo.edu,CSD-Lab-3
+5A,Fri,7,Operating Systems Laboratory,meera.iyer@demo.edu,CSD-Lab-1
+3A,Sat,1,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3A
+3B,Sat,1,Object-Oriented Programming,ravi.kulal@demo.edu,CSD-3B
+5A,Sat,1,Theory of Computation,nisha.reddy@demo.edu,CSD-5A
+5B,Sat,1,Database Management Systems,rohan.desai@demo.edu,CSD-5B
+7A,Sat,1,Distributed Systems,vivek.nair@demo.edu,CSD-7A
+3A,Sat,2,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-3A
+3B,Sat,2,Web Technologies,aditya.joshi@demo.edu,CSD-7A
+5A,Sat,2,Database Management Systems,rohan.desai@demo.edu,CSD-5A
+5B,Sat,2,Operating Systems,meera.iyer@demo.edu,Seminar-201
+3A,Sat,3,Web Technologies,aditya.joshi@demo.edu,CSD-3A
+3B,Sat,3,Data Structures and Algorithms,arjun.kulkarni@demo.edu,CSD-3B
+5A,Sat,3,Probability and Statistics,leela.srinivasan@demo.edu,CSD-5A
+5B,Sat,3,Computer Networks,rohan.desai@demo.edu,Seminar-201
+7A,Sat,3,Machine Learning,tara.banerjee@demo.edu,CSD-5B
+3A,Sat,4,Discrete Mathematics,leela.srinivasan@demo.edu,CSD-3A
+3B,Sat,4,Computer Organization and Architecture,kavya.menon@demo.edu,CSD-3B
+5A,Sat,4,Operating Systems,meera.iyer@demo.edu,CSD-5A
+5B,Sat,4,Software Engineering,meera.shenoy@demo.edu,Seminar-201
+7A,Sat,4,Cybersecurity Fundamentals,tara.banerjee@demo.edu,CSD-7A
