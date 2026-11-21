@@ -1,0 +1,14 @@
+name,email,role,department,teaches
+Dr. Aditi Rao,aditi.rao@demo.edu,hod,Computer Science and Design,True
+Dr. Arjun Kulkarni,arjun.kulkarni@demo.edu,faculty,Computer Science and Design,True
+Prof. Meera Iyer,meera.iyer@demo.edu,faculty,Computer Science and Design,True
+Dr. Rohan Desai,rohan.desai@demo.edu,faculty,Computer Science and Design,True
+Prof. Kavya Menon,kavya.menon@demo.edu,faculty,Computer Science and Design,True
+Dr. Ishaan Kapoor,ishaan.kapoor@demo.edu,faculty,Computer Science and Design,True
+Dr. Nisha Reddy,nisha.reddy@demo.edu,faculty,Computer Science and Design,True
+Prof. Vivek Nair,vivek.nair@demo.edu,faculty,Computer Science and Design,True
+Dr. Tara Banerjee,tara.banerjee@demo.edu,faculty,Computer Science and Design,True
+Prof. Aditya Joshi,aditya.joshi@demo.edu,faculty,Computer Science and Design,True
+Dr. Sanjana Pillai,sanjana.pillai@demo.edu,faculty,Computer Science and Design,True
+Prof. Leela Srinivasan,leela.srinivasan@demo.edu,faculty,Mathematics,True
+Principal (Demo),principal.demo@demo.edu,super_admin,Administration,False

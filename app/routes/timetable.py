@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user, require_acting_admin
 from app.database import get_db
 from app.models import User
+from app.services.admin import AdminNotFound, get_acting_admin
 from app.services.timetable import (
     TimetableCsvError,
     TimetableHistoryConflict,
@@ -30,6 +31,15 @@ def read_timetable(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
 ) -> HTMLResponse:
+    can_import = current_user.role == "super_admin"
+    can_view_reports = current_user.role == "super_admin"
+    if current_user.role != "super_admin":
+        try:
+            acting_admin, _ = get_acting_admin(session, current_user.department, date.today())
+            can_view_reports = acting_admin.id == current_user.id
+            can_import = current_user.role == "hod" and can_view_reports
+        except AdminNotFound:
+            can_import = False
     context = build_timetable_grid(
         session,
         selected_date or date.today(),
@@ -39,7 +49,14 @@ def read_timetable(
     return templates.TemplateResponse(
         request=request,
         name="timetable.html",
-        context={"request": request, "current_user": current_user, **context},
+        context={
+            "request": request,
+            "current_user": current_user,
+            "can_import": can_import,
+            "can_view_reports": can_view_reports,
+            "today": date.today().isoformat(),
+            **context,
+        },
     )
 
 

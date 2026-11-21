@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Mark absence · ClassSwap{% endblock %}
+{% block breadcrumb %}Teaching operations / Mark absence{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div><p class="eyebrow">Coverage request</p><h1>Mark an absence</h1><p class="subtitle">Choose the date and scheduled periods. We’ll show available substitutes next.</p></div>
+</header>
+<section class="panel" style="max-width: 720px">
+  <form id="absence-form" class="form-grid">
+    <label class="field" for="absence-date">Date
+      <input id="absence-date" name="date" type="date" value="{{ today|default('') }}" required>
+    </label>
+    <fieldset style="border: 0; margin: 0; padding: 0">
+      <legend class="field" style="margin-bottom: 8px">Periods</legend>
+      <div class="period-grid">
+        {% for period in range(1, max_period + 1) %}
+        <label class="period-option"><input type="checkbox" name="periods" value="{{ period }}"> Period {{ period }}</label>
+        {% endfor %}
+      </div>
+      <span class="table-status">Only periods where you have a class on the selected weekday can be submitted.</span>
+    </fieldset>
+    <label class="field" for="reason">Reason
+      <select id="reason" name="reason" required>
+        <option value="">Choose a reason</option>
+        <option>Medical leave</option><option>Conference</option><option>Personal work</option><option>Training programme</option>
+      </select>
+    </label>
+    <div id="absence-message" role="status" aria-live="polite"></div>
+    <button class="button" type="submit" style="align-self: start">Find substitutes</button>
+  </form>
+</section>
+<script>
+  document.getElementById("absence-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const message = document.getElementById("absence-message");
+    message.className = "";
+    message.textContent = "";
+    const periods = Array.from(form.querySelectorAll('input[name="periods"]:checked'), (input) => Number(input.value));
+    try {
+      const response = await fetch("/absences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ date: form.date.value, periods, reason: form.reason.value })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        message.className = "notice error";
+        message.textContent = typeof result.detail === "string" ? result.detail : "Please review the date and periods.";
+        return;
+      }
+      message.className = "notice success";
+      message.textContent = "Absence recorded. Opening substitute suggestions…";
+      window.location.assign(`/absences/${result[0].id}/suggestions/view`);
+    } catch {
+      message.className = "notice error";
+      message.textContent = "Could not save this absence. Please try again.";
+    }
+  });
+</script>
+{% endblock %}

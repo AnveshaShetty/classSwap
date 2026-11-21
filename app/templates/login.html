@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Sign in · ClassSwap{% endblock %}
+{% block body %}
+<main class="auth-wrap">
+  <section class="auth-card" aria-labelledby="login-title">
+    <a class="brand auth-brand" href="/login">
+      <span class="brand-mark" aria-hidden="true">CS</span>
+      <span class="brand-name">ClassSwap<span class="brand-tag">CAMPUS COVERAGE</span></span>
+    </a>
+    <p class="eyebrow">Faculty workspace</p>
+    <h1 id="login-title">Welcome back.</h1>
+    <p class="subtitle" style="margin-bottom: 24px">Sign in to manage your schedule and substitution requests.</p>
+    <form id="login-form" class="form-grid">
+      <label class="field" for="email">College email
+        <input id="email" name="email" type="email" autocomplete="username" required>
+      </label>
+      <label class="field" for="password">Password
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <div id="login-message" class="notice error" role="alert" hidden></div>
+      <button class="button" type="submit" style="width: 100%">Sign in</button>
+    </form>
+    <p class="footer">Your session is protected with an HTTP-only cookie.</p>
+  </section>
+</main>
+<script>
+  document.getElementById("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const message = document.getElementById("login-message");
+    message.hidden = true;
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ email: form.email.value, password: form.password.value })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        message.textContent = data.detail || "Sign-in failed. Check your email and password.";
+        message.hidden = false;
+        return;
+      }
+      window.location.assign("/dashboard");
+    } catch {
+      message.textContent = "Could not connect. Please try again.";
+      message.hidden = false;
+    }
+  });
+</script>
+{% endblock %}

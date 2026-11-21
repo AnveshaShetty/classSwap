@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · ClassSwap{% endblock %}
+{% block breadcrumb %}Teaching operations / Overview{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">Daily overview{% if department %} · {{ department }}{% endif %}</p>
+    <h1>Good work starts with a clear view.</h1>
+    <p class="subtitle">Live coverage and substitute activity for {{ selected_date }}.</p>
+  </div>
+  <form class="filter-bar" method="get" action="/dashboard">
+    {% if current_user.role == "super_admin" and department %}
+    <input type="hidden" name="department" value="{{ department }}">
+    {% endif %}
+    <label class="field" for="dashboard-date">View date
+      <input id="dashboard-date" type="date" name="date" value="{{ selected_date }}">
+    </label>
+    <button class="button secondary" type="submit">Update view</button>
+  </form>
+</header>
+
+{% if acting_admin %}
+<section class="banner" aria-label="Acting administrator">
+  <span class="banner-mark" aria-hidden="true">✓</span>
+  <span class="banner-text">
+    Acting admin for this date: <strong>{{ acting_admin.name }}</strong>
+    <span class="banner-meta">{{ acting_admin.position }} · {{ acting_admin.department }}</span>
+  </span>
+</section>
+{% endif %}
+
+<section class="metric-grid" aria-label="Coverage summary">
+  <article class="metric-card">
+    <span class="metric-accent" aria-hidden="true">◷</span>
+    <div class="metric-label">Absences on selected date</div>
+    <div class="metric-value">{{ absence_count }}</div>
+    <div class="metric-note">Scheduled classes needing coverage</div>
+  </article>
+  <article class="metric-card">
+    <span class="metric-accent" aria-hidden="true">✓</span>
+    <div class="metric-label">Covered on this date</div>
+    <div class="metric-value">{% if coverage_rate is not none %}{{ coverage_rate }}%{% else %}—{% endif %}</div>
+    <div class="metric-note">{{ covered_today }} of {{ absence_count }} classes accepted</div>
+  </article>
+  <article class="metric-card">
+    <span class="metric-accent" aria-hidden="true">↗</span>
+    <div class="metric-label">Requests awaiting a response</div>
+    <div class="metric-value">{{ pending_requests }}</div>
+    <div class="metric-note">Pending across the current reporting scope</div>
+  </article>
+  <article class="metric-card">
+    <span class="metric-accent" aria-hidden="true">▤</span>
+    <div class="metric-label">Classes recovered this month</div>
+    <div class="metric-value">{{ periods_recovered }}</div>
+    <div class="metric-note">Accepted substitute assignments</div>
+  </article>
+</section>
+
+<div class="dashboard-grid">
+  <div class="stack">
+    <section class="panel">
+      <header class="panel-heading">
+        <div>
+          <h2>Coverage for {{ selected_date }}</h2>
+          <p class="panel-description">Each entry reflects an actual absence and its latest request status.</p>
+        </div>
+        <a class="inline-link" href="/absence/new">Mark absence →</a>
+      </header>
+      {% if today_absences %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Class</th><th>Absent faculty</th><th>Period</th><th>Coverage</th><th></th></tr></thead>
+          <tbody>
+            {% for item in today_absences %}
+            <tr>
+              <td>
+                <strong>{{ item.section }}</strong><span class="table-status"> · {{ item.subject }}</span>
+                <span class="table-status" style="display: block">{{ item.reason }}</span>
+              </td>
+              <td>{{ item.faculty }}</td>
+              <td>{{ item.period }}</td>
+              <td>
+                <span class="status {{ item.status }}">{{ item.status.replace('_', ' ') }}</span>
+                {% if item.substitute %}<span class="table-status"> · {{ item.substitute }}</span>{% endif %}
+              </td>
+              <td><a class="inline-link" href="/absences/{{ item.id }}/suggestions/view">View →</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <span class="empty-icon" aria-hidden="true">✓</span>
+        <div class="empty-title">No recorded absences</div>
+        <p class="empty-copy">There are no classes awaiting coverage for this date.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <header class="panel-heading">
+        <div>
+          <h2>Accepted coverage · last 7 days</h2>
+          <p class="panel-description">Daily accepted assignments through the selected date.</p>
+        </div>
+      </header>
+      {% set trend_max = coverage_trend|map(attribute='count')|max %}
+      <div class="chart" role="img" aria-label="Accepted coverage by day for the last seven days">
+        {% for day in coverage_trend %}
+        <div class="chart-day" title="{{ day.date }}: {{ day.count }} accepted">
+          <span class="chart-count">{{ day.count }}</span>
+          <span class="chart-track"><span class="chart-bar" style="height: {{ (day.count * 100 / trend_max) if trend_max else 0 }}%"></span></span>
+          <span>{{ day.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <header class="panel-heading">
+      <div>
+        <h2>Substitution balance</h2>
+        <p class="panel-description">Accepted cover assignments this month, ordered by count.</p>
+      </div>
+      <a class="inline-link" href="/reports">Full report →</a>
+    </header>
+    {% if fairness %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Faculty</th><th>Department</th><th>Accepted</th></tr></thead>
+        <tbody>
+          {% for person in fairness %}
+          <tr>
+            <td><strong>{{ person.name }}</strong></td>
+            <td>{{ person.department }}</td>
+            <td>{{ person.accepted }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">↔</span>
+      <div class="empty-title">No eligible faculty data</div>
+      <p class="empty-copy">Teaching accounts will appear here when the department is configured.</p>
+    </div>
+    {% endif %}
+  </section>
+</div>
+<div class="footer">ClassSwap · Clear schedules. Fairer coverage.</div>
+{% endblock %}

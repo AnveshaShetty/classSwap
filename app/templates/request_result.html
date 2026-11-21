@@ -1,0 +1,14 @@
+<article class="request-card" role="status">
+  <span class="status {% if response_status == 'accepted' %}accepted{% else %}declined{% endif %}">
+    {{ response_status }}
+  </span>
+  <p class="subtitle" style="margin-top: 10px">
+    {% if response_status == "accepted" %}
+    You accepted this class. Thank you for covering it.
+    {% elif next_request %}
+    You declined. The next eligible substitute has been offered the class.
+    {% else %}
+    You declined. No further eligible substitutes are currently available.
+    {% endif %}
+  </p>
+</article>

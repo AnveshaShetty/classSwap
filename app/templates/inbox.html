@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}My requests · ClassSwap{% endblock %}
+{% block breadcrumb %}Teaching operations / My requests{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div><p class="eyebrow">Your inbox</p><h1>Substitution requests</h1><p class="subtitle">Review periods offered to you and respond when you can cover the class.</p></div>
+</header>
+<div id="inbox-message" role="status" aria-live="polite"></div>
+<section id="request-list" class="card-list">
+  {% for item in items %}
+  <article class="request-card" id="request-{{ item.substitution.id }}">
+    <div style="align-items: flex-start; display: flex; justify-content: space-between; gap: 12px">
+      <div>
+        <p class="eyebrow" style="margin-bottom: 5px">{{ item.substitution.date }} · Period {{ item.substitution.period_no }}</p>
+        <h2>{{ item.subject }}</h2>
+        <p class="subtitle">{{ item.section }} · requested by {{ item.absent_faculty }}</p>
+      </div>
+      <span class="status pending">Pending</span>
+    </div>
+    <div class="request-actions">
+      <form hx-post="/requests/{{ item.substitution.id }}/respond" hx-target="#request-{{ item.substitution.id }}" hx-swap="outerHTML">
+        <input type="hidden" name="status" value="accepted">
+        <button class="button" type="submit">Accept</button>
+      </form>
+      <form hx-post="/requests/{{ item.substitution.id }}/respond" hx-target="#request-{{ item.substitution.id }}" hx-swap="outerHTML">
+        <input type="hidden" name="status" value="declined">
+        <button class="button secondary" type="submit">Decline</button>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <section class="panel empty-state">
+    <span class="empty-icon" aria-hidden="true">✓</span>
+    <div class="empty-title">You’re all caught up</div>
+    <p class="empty-copy">New substitution requests assigned to you will appear here.</p>
+  </section>
+  {% endfor %}
+</section>
+{% endblock %}

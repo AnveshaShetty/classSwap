@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Substitute suggestions · ClassSwap{% endblock %}
+{% block breadcrumb %}Teaching operations / Coverage options{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div><p class="eyebrow">Coverage options · {{ absence.date }}</p><h1>Choose a substitute</h1><p class="subtitle">{{ section.name }} · {{ subject.name }} · Period {{ absence.period_no }} · {{ absence.reason }}</p></div>
+  <a class="button secondary" href="/dashboard">Back to dashboard</a>
+</header>
+<div id="suggestion-message" role="status" aria-live="polite"></div>
+<section id="suggestion-list" class="card-list" aria-live="polite">
+  <div class="panel empty-state"><span class="empty-icon" aria-hidden="true">↻</span><div class="empty-title">Finding eligible faculty…</div></div>
+</section>
+<script>
+  const absenceId = {{ absence.id }};
+  const list = document.getElementById("suggestion-list");
+  const message = document.getElementById("suggestion-message");
+
+  function makeSuggestionCard(candidate) {
+    const card = document.createElement("article");
+    card.className = "request-card";
+    const top = document.createElement("div");
+    top.style.cssText = "align-items:center;display:flex;justify-content:space-between;gap:14px";
+    const details = document.createElement("div");
+    const name = document.createElement("h2");
+    name.textContent = candidate.name;
+    const email = document.createElement("p");
+    email.className = "subtitle";
+    email.textContent = candidate.email;
+    const reason = document.createElement("p");
+    reason.className = "subtitle";
+    reason.textContent = candidate.reason;
+    details.append(name, email, reason);
+    const score = document.createElement("span");
+    score.className = "status accepted";
+    score.textContent = `${Math.round(candidate.score * 100)}% match`;
+    top.append(details, score);
+    const actions = document.createElement("div");
+    actions.className = "request-actions";
+    const request = document.createElement("button");
+    request.className = "button";
+    request.type = "button";
+    request.textContent = "Request this substitute";
+    request.addEventListener("click", async () => {
+      request.disabled = true;
+      try {
+        const response = await fetch("/substitutions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ absence_id: absenceId, substitute_id: candidate.faculty_id })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          message.className = "notice error";
+          message.textContent = result.detail || "This substitute is no longer available. Refresh suggestions.";
+          request.disabled = false;
+          return;
+        }
+        message.className = "notice success";
+        message.textContent = `Request sent to ${candidate.name}.`;
+        request.textContent = "Request sent";
+      } catch {
+        message.className = "notice error";
+        message.textContent = "Could not connect. Please try again.";
+        request.disabled = false;
+      }
+    });
+    actions.append(request);
+    card.append(top, actions);
+    return card;
+  }
+
+  fetch(`/absences/${absenceId}/suggestions`, { credentials: "same-origin" })
+    .then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Could not load suggestions.");
+      list.replaceChildren();
+      if (!data.length) {
+        const empty = document.createElement("div");
+        empty.className = "panel empty-state";
+        empty.textContent = "No eligible substitutes are currently available for this period.";
+        list.append(empty);
+        return;
+      }
+      data.forEach((candidate) => list.append(makeSuggestionCard(candidate)));
+    })
+    .catch((error) => {
+      list.replaceChildren();
+      message.className = "notice error";
+      message.textContent = error.message;
+    });
+</script>
+{% endblock %}
