@@ -17,6 +17,26 @@ from app.models import (
 from app.services.admin import AdminNotFound, get_acting_admin
 
 
+PORTRAITS = {
+    "meera.shenoy@demo.edu": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=160&h=160&q=85",
+    "arjun.kulkarni@demo.edu": "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=160&h=160&q=85",
+    "meera.iyer@demo.edu": "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=160&h=160&q=85",
+    "rohan.desai@demo.edu": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&h=160&q=85",
+    "kavya.menon@demo.edu": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&h=160&q=85",
+    "ravi.kulal@demo.edu": "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=160&h=160&q=85",
+    "nisha.reddy@demo.edu": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=85",
+    "vivek.nair@demo.edu": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&h=160&q=85",
+    "tara.banerjee@demo.edu": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&h=160&q=85",
+    "aditya.joshi@demo.edu": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=160&h=160&q=85",
+    "sanjana.pillai@demo.edu": "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=160&h=160&q=85",
+    "leela.srinivasan@demo.edu": "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=160&h=160&q=85",
+}
+
+
+def portrait_url(email: str) -> str:
+    return PORTRAITS.get(email.lower(), PORTRAITS["meera.iyer@demo.edu"])
+
+
 def _month_bounds(target: date) -> tuple[date, date]:
     first = target.replace(day=1)
     if first.month == 12:
@@ -123,6 +143,7 @@ def build_dashboard_data(
             "email": person.email,
             "department": person.department,
             "accepted": accepted_counts.get(person.id, 0),
+            "photo": portrait_url(person.email),
         }
         for person in faculty
     ]

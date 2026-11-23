@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Absence, Section, Subject, Substitution, Timetable, User
 from app.services.dashboard import _coverage
+from app.services.dashboard import portrait_url
 
 
 REPORT_COLUMNS = (
@@ -99,6 +100,7 @@ def build_monthly_report(
                 "name": person.name,
                 "email": person.email,
                 "accepted": accepted_counts[person.id],
+                "photo": portrait_url(person.email),
             })
         fairness.sort(key=lambda item: (item["accepted"], item["name"].casefold()))
 

@@ -8,10 +8,10 @@
 4. **Absence marking and suggestions** — validates scheduled absences and ranks up to three free, qualified substitutes using configurable scoring and break-aware adjacent load. Unit and integration tests cover eligibility and active substitution exclusions.
 5. **Substitution requests and clashes** — pending requests, inbox accept/decline, automatic next-candidate offers, HOD auto-requests, and free-room lookup. Full suite passes.
 6. **Acting admin, leave, and audit** — resolves the on-duty admin, limits stand-in permissions, supports transactional whole-day leave and chain editing, and records administrative writes. Full suite passes.
+7. **Dashboard, reporting, and responsive UI** — database-derived dashboard metrics, monthly coverage reports, CSV export, Lucide icons, fixed faculty portraits, loading and empty states, and custom 404/500 views. Full suite passes.
 
 ## Remaining
 
-7. Dashboard, reports, and UI
 8. Setup/demo documentation
 
 Docker was unavailable during milestone 1, so PostgreSQL container startup has not yet been verified.

@@ -101,7 +101,7 @@ def test_dashboard_api_and_page_use_stored_absence_data(
     assert data["today_absences"][0]["status"] == "unrequested"
     page = client.get("/dashboard", params={"date": target_date.isoformat()})
     assert page.status_code == 200
-    assert "Coverage for 2026-11-23" in page.text
+    assert "Absence register" in page.text
     assert "Medical leave" in page.text
 
 
@@ -155,6 +155,20 @@ def test_ui_routes_render_without_external_images(
     assert all(response.status_code == 200 for response in (absence, inbox, timetable))
     assert "<img" not in login.text.lower()
     assert "<img" not in absence.text.lower()
+
+
+def test_custom_error_page_and_favicon(
+    dashboard_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, _, _ = dashboard_context
+
+    missing = client.get("/this-page-does-not-exist")
+    favicon = client.get("/static/favicon.svg")
+
+    assert missing.status_code == 404
+    assert "We couldn’t find that page" in missing.text
+    assert favicon.status_code == 200
+    assert "image/svg+xml" in favicon.headers["content-type"]
 
 
 def test_inbox_responds_with_htmx_fragment_without_page_reload(

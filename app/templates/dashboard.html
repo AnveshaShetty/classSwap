@@ -5,8 +5,8 @@
 <header class="page-heading">
   <div>
     <p class="eyebrow">Daily overview{% if department %} · {{ department }}{% endif %}</p>
-    <h1>Good work starts with a clear view.</h1>
-    <p class="subtitle">Live coverage and substitute activity for {{ selected_date }}.</p>
+    <h1>Today at a glance</h1>
+    <p class="subtitle">Coverage activity for {{ selected_date }} across the selected department.</p>
   </div>
   <form class="filter-bar" method="get" action="/dashboard">
     {% if current_user.role == "super_admin" and department %}
@@ -21,7 +21,7 @@
 
 {% if acting_admin %}
 <section class="banner" aria-label="Acting administrator">
-  <span class="banner-mark" aria-hidden="true">✓</span>
+  <span class="banner-mark" aria-hidden="true"><i data-lucide="shield-check"></i></span>
   <span class="banner-text">
     Acting admin for this date: <strong>{{ acting_admin.name }}</strong>
     <span class="banner-meta">{{ acting_admin.position }} · {{ acting_admin.department }}</span>
@@ -31,26 +31,26 @@
 
 <section class="metric-grid" aria-label="Coverage summary">
   <article class="metric-card">
-    <span class="metric-accent" aria-hidden="true">◷</span>
-    <div class="metric-label">Absences on selected date</div>
+    <span class="metric-accent" aria-hidden="true"><i data-lucide="calendar-x"></i></span>
+    <div class="metric-label">Classes without a teacher</div>
     <div class="metric-value">{{ absence_count }}</div>
     <div class="metric-note">Scheduled classes needing coverage</div>
   </article>
   <article class="metric-card">
-    <span class="metric-accent" aria-hidden="true">✓</span>
-    <div class="metric-label">Covered on this date</div>
+    <span class="metric-accent" aria-hidden="true"><i data-lucide="circle-check"></i></span>
+    <div class="metric-label">Coverage secured</div>
     <div class="metric-value">{% if coverage_rate is not none %}{{ coverage_rate }}%{% else %}—{% endif %}</div>
     <div class="metric-note">{{ covered_today }} of {{ absence_count }} classes accepted</div>
   </article>
   <article class="metric-card">
-    <span class="metric-accent" aria-hidden="true">↗</span>
-    <div class="metric-label">Requests awaiting a response</div>
+    <span class="metric-accent" aria-hidden="true"><i data-lucide="mail-question"></i></span>
+    <div class="metric-label">Answers outstanding</div>
     <div class="metric-value">{{ pending_requests }}</div>
     <div class="metric-note">Pending across the current reporting scope</div>
   </article>
   <article class="metric-card">
-    <span class="metric-accent" aria-hidden="true">▤</span>
-    <div class="metric-label">Classes recovered this month</div>
+    <span class="metric-accent" aria-hidden="true"><i data-lucide="repeat-2"></i></span>
+    <div class="metric-label">Accepted cover this month</div>
     <div class="metric-value">{{ periods_recovered }}</div>
     <div class="metric-note">Accepted substitute assignments</div>
   </article>
@@ -61,8 +61,8 @@
     <section class="panel">
       <header class="panel-heading">
         <div>
-          <h2>Coverage for {{ selected_date }}</h2>
-          <p class="panel-description">Each entry reflects an actual absence and its latest request status.</p>
+          <h2>Absence register</h2>
+          <p class="panel-description">The latest cover decision for each class on {{ selected_date }}.</p>
         </div>
         <a class="inline-link" href="/absence/new">Mark absence →</a>
       </header>
@@ -91,9 +91,9 @@
       </div>
       {% else %}
       <div class="empty-state">
-        <span class="empty-icon" aria-hidden="true">✓</span>
-        <div class="empty-title">No recorded absences</div>
-        <p class="empty-copy">There are no classes awaiting coverage for this date.</p>
+        <span class="empty-icon" aria-hidden="true"><i data-lucide="circle-check"></i></span>
+        <div class="empty-title">No classes need cover</div>
+        <p class="empty-copy">No absences are recorded for this date.</p>
       </div>
       {% endif %}
     </section>
@@ -133,7 +133,7 @@
         <tbody>
           {% for person in fairness %}
           <tr>
-            <td><strong>{{ person.name }}</strong></td>
+            <td><div class="person-cell"><img class="portrait" src="{{ person.photo }}" alt="Portrait of {{ person.name }}" width="38" height="38" loading="lazy"><strong>{{ person.name }}</strong></div></td>
             <td>{{ person.department }}</td>
             <td>{{ person.accepted }}</td>
           </tr>
@@ -143,9 +143,9 @@
     </div>
     {% else %}
     <div class="empty-state">
-      <span class="empty-icon" aria-hidden="true">↔</span>
-      <div class="empty-title">No eligible faculty data</div>
-      <p class="empty-copy">Teaching accounts will appear here when the department is configured.</p>
+      <span class="empty-icon" aria-hidden="true"><i data-lucide="users"></i></span>
+      <div class="empty-title">No substitute activity yet</div>
+      <p class="empty-copy">Accepted assignments will appear here during this month.</p>
     </div>
     {% endif %}
   </section>

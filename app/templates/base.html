@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>{% block title %}ClassSwap{% endblock %}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="theme-color" content="#183541">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -23,14 +28,15 @@
       --red: #a64e43;
       --red-pale: #fbefed;
       --navy: #183541;
-      --shadow: 0 14px 36px rgba(27, 51, 57, .055);
+      --shadow: 0 12px 32px rgba(27, 51, 57, .055);
+      --radius: 12px;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       background: var(--canvas);
       color: var(--ink);
-      font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: 15px/1.5 "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     a { color: inherit; text-decoration: none; }
@@ -55,7 +61,7 @@
     .brand-mark {
       align-items: center;
       background: #d7eee3;
-      border-radius: 12px;
+      border-radius: var(--radius);
       color: var(--green-dark);
       display: inline-flex;
       font-size: 15px;
@@ -78,7 +84,7 @@
     }
     .nav-link {
       align-items: center;
-      border-radius: 10px;
+      border-radius: var(--radius);
       color: #c9d8d8;
       display: flex;
       font-size: 13px;
@@ -131,14 +137,15 @@
     .panel, .metric-card {
       background: var(--paper);
       border: 1px solid var(--line);
-      border-radius: 16px;
+      border-radius: var(--radius);
       box-shadow: var(--shadow);
     }
     .panel { padding: 21px; }
     .panel-heading { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 18px; }
     .panel-description { color: var(--muted); font-size: 12px; margin: 5px 0 0; }
-    .metric-grid { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 20px; }
-    .metric-card { min-height: 133px; padding: 19px 20px; position: relative; }
+    .metric-grid { display: grid; gap: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 8px 0 32px; border-bottom: 1px solid var(--line); border-top: 1px solid var(--line); }
+    .metric-card { min-height: 128px; padding: 24px 24px 20px; position: relative; border-right: 1px solid var(--line); background: transparent; border-radius: 0; box-shadow: none; }
+    .metric-card:last-child { border-right: 0; }
     .metric-label { color: var(--muted); font-size: 12px; font-weight: 600; }
     .metric-value { font-size: 30px; font-weight: 760; letter-spacing: -.055em; line-height: 1.2; margin-top: 13px; }
     .metric-note { color: #839199; font-size: 11px; margin-top: 5px; }
@@ -158,7 +165,7 @@
       align-items: center;
       background: #eaf3ee;
       border: 1px solid #d6e8dd;
-      border-radius: 13px;
+      border-radius: var(--radius);
       color: #25493c;
       display: flex;
       gap: 12px;
@@ -173,7 +180,7 @@
       align-items: center;
       background: var(--green);
       border: 1px solid var(--green);
-      border-radius: 9px;
+      border-radius: var(--radius);
       color: #fff;
       display: inline-flex;
       font-size: 12px;
@@ -193,7 +200,7 @@
     input, select, textarea {
       background: #fff;
       border: 1px solid #dce4e2;
-      border-radius: 9px;
+      border-radius: var(--radius);
       color: var(--ink);
       min-height: 40px;
       outline: none;
@@ -221,8 +228,35 @@
     .request-card { border: 1px solid var(--line); border-radius: 13px; padding: 16px; }
     .request-actions { display: flex; gap: 8px; margin-top: 14px; }
     .footer { color: #8a979b; font-size: 10px; padding-top: 24px; text-align: center; }
+    .skip-link { background: #fff; border-radius: var(--radius); color: var(--ink); left: 12px; padding: 8px 12px; position: fixed; top: -60px; z-index: 100; }
+    .skip-link:focus { top: 12px; }
+    .loading-screen {
+      align-items: center;
+      background: rgba(245, 247, 245, .92);
+      display: none;
+      inset: 0;
+      justify-content: center;
+      position: fixed;
+      z-index: 80;
+    }
+    .loading-screen.visible { display: flex; }
+    .loading-content { align-items: center; color: #41585f; display: flex; flex-direction: column; font-size: 12px; gap: 12px; }
+    .loading-mark { animation: loading-pulse 1.2s ease-in-out infinite; background: var(--green); border-radius: var(--radius); height: 44px; width: 44px; }
+    .loading-line { animation: loading-line 1.2s ease-in-out infinite; background: #d9e4df; border-radius: var(--radius); height: 3px; overflow: hidden; width: 120px; }
+    .loading-line::after { animation: loading-travel 1.2s ease-in-out infinite; background: var(--green); content: ""; display: block; height: 100%; width: 42%; }
+    .error-card { max-width: 520px; text-align: left; }
+    .error-code { color: #9bb5aa; display: block; font-size: 56px; font-weight: 800; letter-spacing: -.08em; line-height: 1; margin-bottom: 24px; }
+    .portrait { border: 1px solid #dde6e1; border-radius: 50%; height: 38px; object-fit: cover; width: 38px; }
+    .person-cell { align-items: center; display: flex; gap: 10px; }
+    .content { animation: page-enter .32s ease-out both; }
+    @keyframes page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes loading-pulse { 50% { opacity: .72; transform: scale(.94); } }
+    @keyframes loading-travel { 50% { transform: translateX(138%); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
     .auth-wrap { align-items: center; display: flex; justify-content: center; min-height: 100vh; padding: 24px; }
-    .auth-card { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); max-width: 430px; padding: 34px; width: 100%; }
+    .auth-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); max-width: 430px; padding: 34px; width: 100%; }
     .auth-brand { margin: 0 0 30px; padding: 0; }
     .form-grid { display: grid; gap: 14px; }
     .period-grid { display: grid; gap: 8px; grid-template-columns: repeat(4, 1fr); }
@@ -230,7 +264,10 @@
     .period-option input { accent-color: var(--green); min-height: auto; width: auto; }
     .table-status { color: #66777c; font-size: 11px; }
     @media (max-width: 1000px) {
-      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+      .metric-card { border-bottom: 1px solid var(--line); }
+      .metric-card:nth-child(2) { border-right: 0; }
+      .metric-card:nth-child(3), .metric-card:nth-child(4) { border-bottom: 0; }
       .dashboard-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 720px) {
@@ -262,6 +299,10 @@
   {% block head %}{% endblock %}
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Loading">
+    <div class="loading-content"><span class="loading-mark" aria-hidden="true"></span><span>Preparing this view…</span><span class="loading-line" aria-hidden="true"></span></div>
+  </div>
   <div class="app-shell">
     {% if current_user is defined and current_user %}
     <aside class="sidebar" aria-label="Main navigation">
@@ -271,18 +312,18 @@
       </a>
       <nav class="nav-group">
         <span class="nav-caption">Workspace</span>
-        <a class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span class="nav-icon">⌂</span>Dashboard</a>
-        <a class="nav-link {% if request.url.path == '/timetable' %}active{% endif %}" href="/timetable"><span class="nav-icon">▦</span>Timetable</a>
-        {% if current_user.teaches %}<a class="nav-link {% if request.url.path == '/absence/new' %}active{% endif %}" href="/absence/new"><span class="nav-icon">＋</span>Mark absence</a>{% endif %}
-        <a class="nav-link {% if request.url.path == '/requests' %}active{% endif %}" href="/requests"><span class="nav-icon">↔</span>My requests</a>
-        {% if can_view_reports|default(false) %}<a class="nav-link {% if request.url.path.startswith('/reports') %}active{% endif %}" href="/reports"><span class="nav-icon">▤</span>Reports</a>{% endif %}
+        <a class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><i class="nav-icon" data-lucide="layout-dashboard" aria-hidden="true"></i>Dashboard</a>
+        <a class="nav-link {% if request.url.path == '/timetable' %}active{% endif %}" href="/timetable"><i class="nav-icon" data-lucide="calendar-days" aria-hidden="true"></i>Timetable</a>
+        {% if current_user.teaches %}<a class="nav-link {% if request.url.path == '/absence/new' %}active{% endif %}" href="/absence/new"><i class="nav-icon" data-lucide="calendar-minus" aria-hidden="true"></i>Mark absence</a>{% endif %}
+        <a class="nav-link {% if request.url.path == '/requests' %}active{% endif %}" href="/requests"><i class="nav-icon" data-lucide="inbox" aria-hidden="true"></i>My requests</a>
+        {% if can_view_reports|default(false) %}<a class="nav-link {% if request.url.path.startswith('/reports') %}active{% endif %}" href="/reports"><i class="nav-icon" data-lucide="chart-no-axes-column-increasing" aria-hidden="true"></i>Reports</a>{% endif %}
       </nav>
       <div class="sidebar-bottom">
         <div class="user-chip">
           <span class="avatar" aria-hidden="true">{{ current_user.name.split()|map('first')|join|upper|truncate(2, true, '') }}</span>
           <span class="user-name">{{ current_user.name }}<span class="user-role">{{ current_user.role.replace('_', ' ') }}</span></span>
         </div>
-        <a class="logout-link" href="/logout">Sign out ↗</a>
+        <a class="logout-link" href="/logout">Sign out</a>
       </div>
     </aside>
     {% endif %}
@@ -293,8 +334,17 @@
         <span class="topbar-date">{{ current_date|default(today|default('')) }}</span>
       </header>
       {% endif %}
-      {% block body %}<main class="content">{% block content %}{% endblock %}</main>{% endblock %}
+      {% block body %}<main class="content" id="main-content">{% block content %}{% endblock %}</main>{% endblock %}
     </div>
   </div>
+  <script>
+    if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.8 } });
+    document.addEventListener("htmx:beforeRequest", () => document.getElementById("loading-screen")?.classList.add("visible"));
+    document.addEventListener("htmx:afterRequest", () => document.getElementById("loading-screen")?.classList.remove("visible"));
+    document.addEventListener("submit", (event) => {
+      if (!event.target.matches('[method="get"]')) return;
+      document.getElementById("loading-screen")?.classList.add("visible");
+    });
+  </script>
 </body>
 </html>

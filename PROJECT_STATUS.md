@@ -18,7 +18,7 @@ The UI reads application records from the database. Dashboard counts, tables, an
 | 4 | Absence recording and ranked substitute suggestions | Complete · `97c3aeb` |
 | 5 | Request, inbox, accept/decline, next-candidate offers, and room lookup | Complete · `a0a74dc` |
 | 6 | Acting admin, whole-day leave, admin chain, and audit records | Complete · `f117db8` |
-| 7 | Dashboard, monthly reporting, and responsive application UI | Complete · current full-suite verification pending |
+| 7 | Dashboard, monthly reporting, and responsive application UI | Complete · 39-test full-suite verification |
 | 8 | Final setup/demo README and screenshot checklist | Still to be completed |
 
 ## Implemented screens

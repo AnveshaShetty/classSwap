@@ -54,9 +54,9 @@
   </div>
   {% else %}
   <div class="empty-state">
-    <span class="empty-icon" aria-hidden="true">▤</span>
+    <span class="empty-icon" aria-hidden="true"><i data-lucide="file-chart-column"></i></span>
     <div class="empty-title">No absence records for {{ month_label }}</div>
-    <p class="empty-copy">Choose another month or check that the timetable and absence records are loaded.</p>
+    <p class="empty-copy">Select another month or confirm that absences have been recorded for this department.</p>
   </div>
   {% endif %}
 </section>
@@ -67,7 +67,7 @@
   <div class="table-wrap">
     <table>
       <thead><tr><th>Faculty</th><th>Email</th><th>Accepted</th></tr></thead>
-      <tbody>{% for person in fairness %}<tr><td><strong>{{ person.name }}</strong></td><td>{{ person.email }}</td><td>{{ person.accepted }}</td></tr>{% endfor %}</tbody>
+      <tbody>{% for person in fairness %}<tr><td><div class="person-cell"><img class="portrait" src="{{ person.photo }}" alt="Portrait of {{ person.name }}" width="38" height="38" loading="lazy"><strong>{{ person.name }}</strong></div></td><td>{{ person.email }}</td><td>{{ person.accepted }}</td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </section>
