@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.core.body_limits import RequestBodyLimitMiddleware
 from app.core.csrf import CSRF_COOKIE_NAME
+from app.core.rate_limit import rate_limit_response
 from app.core.templating import templates
 from app.routes.absence import router as absence_router
 from app.routes.admin import router as admin_router
@@ -48,6 +49,14 @@ for route in app.routes:
         "/docs/oauth2-redirect",
     }:
         route.openapi_extra = {"x-auth-policy": "public"}
+
+
+@app.middleware("http")
+async def apply_rate_limits(request: Request, call_next):
+    limited_response = rate_limit_response(request)
+    if limited_response is not None:
+        return limited_response
+    return await call_next(request)
 
 
 @app.middleware("http")

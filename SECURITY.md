@@ -193,6 +193,30 @@ user-facing string and a PostgreSQL-backed verification of import rollback.
 Inline scripts remain and strict nonce-based CSP and self-hosted browser
 dependencies are Phase 5 work. These controls are not claimed complete.
 
+## Phase 4: public surface, tokens, and abuse protection
+
+**Status: partial.** Added a per-IP in-memory limiter: global traffic is capped
+at 300 requests/minute, public/unauthenticated routes at 120/minute, login at
+30/minute, password-reset endpoints at 10 per 15 minutes, and CSV upload at
+10/minute. Rejections return 429 with `Retry-After`. Login also retains the
+per-account/per-IP progressive lockout from Phase 1. Password-reset tokens
+remain 256-bit random values stored as SHA-256 hashes, short-lived, and
+single-use.
+
+The current checkout does not implement public `/today`, `/week`, or QR
+timetable routes, calendar feeds, Telegram linking, or one-click action links.
+Those are not exposed by this application version; the authenticated
+`/timetable` page is not a student-public endpoint. Password reset is the only
+email token flow present. No Telegram bot or user-controlled server-side URL
+fetching exists.
+
+Remaining Phase 4 work: add a public student timetable only if the product
+requires it, then apply an explicit section allowlist and PII regression
+scans; migrate rate-limit state to Redis or another shared service for
+multi-worker deployments; and add notification delivery limits if those
+features are introduced. The in-memory limiter is process-local and is not
+sufficient as the sole production DDoS control.
+
 ### OWASP Top 10 (2021) initial mapping
 
 | Category | Phase 0 status | Evidence / next step |
