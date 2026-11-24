@@ -50,13 +50,6 @@ def login_page(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/logout", include_in_schema=False)
-def logout() -> RedirectResponse:
-    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie(settings.auth_cookie_name, path="/")
-    return response
-
-
 @router.get("/absence/new", response_class=HTMLResponse)
 def absence_form(
     request: Request,

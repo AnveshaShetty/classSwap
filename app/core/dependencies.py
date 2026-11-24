@@ -1,35 +1,55 @@
 from collections.abc import Callable
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.core.security import get_token_user_id
+from app.core.security import create_access_token, decode_access_token
 from app.models import User
 from app.services.admin import AdminNotFound, get_acting_admin
 
 
 def get_current_user(
     request: Request,
+    response: Response,
     session: Session = Depends(get_db),
 ) -> User:
     token = request.cookies.get(settings.auth_cookie_name)
-    user_id = get_token_user_id(token) if token else None
-    if user_id is None:
+    claims = decode_access_token(token) if token else None
+    if claims is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Please sign in to continue.",
         )
 
-    user = session.scalar(select(User).where(User.id == user_id))
-    if user is None:
+    user = session.scalar(select(User).where(User.id == int(claims["sub"])))
+    if user is None or claims["ver"] != user.token_version:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Your session is no longer valid. Please sign in again.",
+        )
+    expires_at = datetime.fromtimestamp(int(claims["exp"]), timezone.utc)
+    if expires_at - datetime.now(timezone.utc) <= timedelta(minutes=10):
+        session_started_at = datetime.fromtimestamp(
+            int(claims["session_started"]),
+            timezone.utc,
+        )
+        response.set_cookie(
+            key=settings.auth_cookie_name,
+            value=create_access_token(
+                user.id,
+                token_version=user.token_version,
+                session_started_at=session_started_at,
+            ),
+            httponly=True,
+            secure=settings.cookie_secure,
+            samesite="lax",
+            max_age=settings.access_token_expire_minutes * 60,
+            path="/",
         )
     return user
 

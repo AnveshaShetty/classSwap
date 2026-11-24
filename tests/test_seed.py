@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import User
 from scripts.seed import PASSWORD_CONTEXT, seed_database
 
@@ -32,6 +33,19 @@ def test_seed_loads_all_csvs_in_dependency_order(tmp_path: Path) -> None:
         assert faculty is not None and faculty.role == "faculty"
         assert PASSWORD_CONTEXT.verify("demo123", hod.password_hash)
         assert PASSWORD_CONTEXT.verify("demo123", faculty.password_hash)
+        assert hod.password_hash.startswith("$argon2id$")
+        assert hod.must_change_password is True
+        assert faculty.must_change_password is True
+
+    database_engine.dispose()
+
+
+def test_seed_refuses_production_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    database_engine = create_engine("sqlite:///" + str(tmp_path / "seed.db"))
+    monkeypatch.setattr(settings, "environment", "production")
+
+    with pytest.raises(RuntimeError, match="disabled in production"):
+        seed_database(database_engine)
 
     database_engine.dispose()
 

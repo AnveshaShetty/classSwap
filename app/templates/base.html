@@ -323,7 +323,7 @@
           <span class="avatar" aria-hidden="true">{{ current_user.name.split()|map('first')|join|upper|truncate(2, true, '') }}</span>
           <span class="user-name">{{ current_user.name }}<span class="user-role">{{ current_user.role.replace('_', ' ') }}</span></span>
         </div>
-        <a class="logout-link" href="/logout">Sign out</a>
+        <form action="/auth/logout" method="post"><button class="logout-link" type="submit">Sign out</button></form>
       </div>
     </aside>
     {% endif %}

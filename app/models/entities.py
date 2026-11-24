@@ -33,6 +33,27 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="faculty")
     department: Mapped[str] = mapped_column(String(120), nullable=False)
     teaches: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+
+
+class LoginAttempt(Base):
+    __tablename__ = "login_attempts"
+    __table_args__ = (
+        UniqueConstraint("scope", "key_hash", name="uq_login_attempt_scope_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scope: Mapped[str] = mapped_column(String(10), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    failures: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class Subject(Base):

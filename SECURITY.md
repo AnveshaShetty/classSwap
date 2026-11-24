@@ -68,6 +68,40 @@ production cookie and transport settings; centralize and enforce object-level
 authorization; scope acting-admin lookups; and self-host or integrity-pin
 third-party scripts.
 
+## Phase 1: authentication and sessions
+
+**Status: partial.** Implemented production secret validation, a pinned HS256
+algorithm, Secure `__Host-` cookies, Argon2id password hashing with bcrypt
+rehashing on successful login, generic login errors with a dummy hash check,
+database-backed per-account/per-IP lockout, password policy validation and
+change, 30-minute sliding sessions with an eight-hour absolute lifetime, and
+server-side logout/password-change invalidation via `token_version`. The seed
+command is disabled in production; development seed accounts are marked
+`must_change_password`.
+
+Regression evidence: `test_production_settings_reject_unsafe_jwt_secret`,
+`test_login_cookie_is_secure_when_configured`,
+`test_unknown_and_known_login_failures_have_same_response`,
+`test_login_is_locked_after_five_failures`,
+`test_legacy_bcrypt_hash_is_upgraded_after_successful_login`,
+`test_logout_invalidates_previously_issued_token`,
+`test_password_change_invalidates_old_token`,
+`test_tokens_reject_none_and_non_hs256_algorithms`,
+`test_seed_refuses_production_mode`, and
+`test_seed_loads_all_csvs_in_dependency_order`. Full suite: 53 passed.
+
+Behavior changes: `/logout` is no longer a state-changing GET; use the POST
+`/auth/logout` form. Production now fails closed for missing/placeholder
+secrets or insecure cookie configuration. The local `__Host-` cookie is marked
+Secure, which requires HTTPS (localhost is typically treated as a secure
+context by browsers). Successful password changes revoke existing sessions.
+Five failed attempts trigger a 15-minute lockout with exponential backoff.
+
+Still open in this phase: password-reset email/token workflow, TOTP enrollment
+and enforcement for privileged roles, and admin-driven force logout. These
+must be implemented and regression-tested before Phase 1 can be considered
+complete.
+
 ### OWASP Top 10 (2021) initial mapping
 
 | Category | Phase 0 status | Evidence / next step |

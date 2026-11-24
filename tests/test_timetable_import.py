@@ -42,7 +42,7 @@ def timetable_context() -> Iterator[tuple[TestClient, Engine]]:
     )
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: hod
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         yield client, test_engine
     app.dependency_overrides.clear()
     test_engine.dispose()
