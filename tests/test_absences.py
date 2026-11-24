@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from tests.conftest import configure_csrf_client
 from app.config import settings
 from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
@@ -48,7 +49,8 @@ def absence_context() -> Iterator[tuple[TestClient, Engine, User]]:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: current_faculty
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
         yield client, test_engine, current_faculty
     app.dependency_overrides.clear()
     test_engine.dispose()
@@ -103,6 +105,38 @@ def test_faculty_cannot_mark_past_absence(absence_context: tuple[TestClient, Eng
         assert session.scalar(
             select(func.count()).select_from(Absence).where(Absence.faculty_id == faculty.id)
         ) == existing_absences
+
+
+def test_csrf_less_absence_post_is_rejected(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+
+    response = client.post(
+        "/absences",
+        json={"date": "2026-11-30", "periods": [3], "reason": "Missing token"},
+        headers={"X-CSRF-Token": ""},
+    )
+
+    assert response.status_code == 403
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Absence)) == 20
+
+
+def test_cross_origin_absence_post_is_rejected(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+
+    response = client.post(
+        "/absences",
+        json={"date": "2026-11-30", "periods": [3], "reason": "Cross-origin"},
+        headers={"Origin": "https://attacker.example"},
+    )
+
+    assert response.status_code == 403
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Absence)) == 20
 
 
 def test_suggestions_exclude_teachers_busy_in_target_slot(absence_context: tuple[TestClient, Engine, User]) -> None:

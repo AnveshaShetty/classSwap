@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.authorization import can_access_department, can_edit_admin_chain
+from app.core.csrf import require_csrf
 from app.core.dependencies import (
     get_current_user,
     require_acting_admin,
@@ -32,7 +33,7 @@ from app.services.admin import (
 )
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 @router.get("/admin/acting", response_model=ActingAdminRead)

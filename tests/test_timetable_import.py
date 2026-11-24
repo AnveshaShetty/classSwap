@@ -18,6 +18,8 @@ from app.database import Base, get_db
 from app.main import app
 from app.models import Leave, Room, Section, Timetable, User
 from scripts.seed import load_seed
+from app.services.timetable import MAX_UPLOAD_BYTES
+from tests.conftest import configure_csrf_client
 
 
 @pytest.fixture
@@ -60,6 +62,7 @@ def timetable_context(
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: admin
     with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
         client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
         yield client, test_engine
     app.dependency_overrides.clear()
@@ -82,6 +85,75 @@ def test_invalid_csv_reports_row_and_imports_nothing(timetable_context: tuple[Te
     assert response.status_code == 422
     errors = response.json()["detail"]["errors"]
     assert any(error["row"] == 121 and "Unknown section" in error["message"] for error in errors)
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Timetable)) == 119
+
+
+def test_import_rejects_oversized_csv_without_importing_rows(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("large.csv", b"x" * (MAX_UPLOAD_BYTES + 1), "text/csv")},
+    )
+
+    assert response.status_code == 413
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Timetable)) == 119
+
+
+def test_import_rejects_more_than_5000_rows_without_importing(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+    content = (
+        b"section,day,period,subject,faculty_email,room\n"
+        + b"Missing,Mon,1,Subject,teacher@example.edu,Room\n" * 5001
+    )
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("large.csv", content, "text/csv")},
+    )
+
+    assert response.status_code == 422
+    assert "5,000 rows" in response.json()["detail"]["errors"][0]["message"]
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Timetable)) == 119
+
+
+def test_import_requires_csv_filename_and_content_type(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, _ = timetable_context
+
+    bad_extension = client.post(
+        "/timetable/import",
+        files={"file": ("timetable.txt", b"data", "text/csv")},
+    )
+    bad_content_type = client.post(
+        "/timetable/import",
+        files={"file": ("timetable.csv", b"data", "application/octet-stream")},
+    )
+
+    assert bad_extension.status_code == 415
+    assert bad_content_type.status_code == 415
+
+
+def test_import_rejects_non_utf8_csv_without_importing_rows(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("invalid.csv", b"\xff\xfe\x00", "text/csv")},
+    )
+
+    assert response.status_code == 422
+    assert "UTF-8" in response.json()["detail"]["errors"][0]["message"]
     with Session(test_engine) as session:
         assert session.scalar(select(func.count()).select_from(Timetable)) == 119
 

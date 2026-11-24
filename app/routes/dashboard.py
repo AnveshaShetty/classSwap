@@ -1,14 +1,13 @@
 import re
 from datetime import date, datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_acting_admin
+from app.core.templating import templates
 from app.database import get_db
 from app.models import AdminChain, User
 from app.services.admin import AdminNotFound, get_acting_admin
@@ -17,7 +16,6 @@ from app.services.reports import build_monthly_report, render_monthly_csv
 
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 
 

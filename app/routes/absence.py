@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.authorization import can_access_absence
+from app.core.csrf import require_csrf
 from app.core.dependencies import get_current_user
 from app.database import get_db
 from app.models import User
@@ -18,7 +19,7 @@ from app.services.suggestion import suggest_candidates
 from app.services.substitution import auto_request_for_hod_absence
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 @router.post("/absences", response_model=list[AbsenceRead])

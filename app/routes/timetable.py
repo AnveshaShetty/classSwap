@@ -1,17 +1,17 @@
 from datetime import date
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.authorization import can_import_timetable
+from app.core.csrf import require_csrf
 from app.core.dependencies import get_current_user, require_policy
 from app.database import get_db
+from app.core.templating import templates
 from app.models import User
 from app.services.admin import AdminNotFound, get_acting_admin
 from app.services.timetable import (
+    MAX_UPLOAD_BYTES,
     TimetableCsvError,
     TimetableHistoryConflict,
     build_timetable_grid,
@@ -19,8 +19,7 @@ from app.services.timetable import (
 )
 
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 @router.get("/timetable", response_class=HTMLResponse)
@@ -67,7 +66,13 @@ async def import_timetable(
     actor: User = Depends(require_policy(can_import_timetable)),
     session: Session = Depends(get_db),
 ) -> dict[str, int]:
-    content = await file.read()
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=415, detail="Upload a .csv timetable file.")
+    if file.content_type != "text/csv":
+        raise HTTPException(status_code=415, detail="The uploaded file must have the text/csv content type.")
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="The CSV file exceeds the 2 MB limit.")
     try:
         imported_rows = import_timetable_csv(session, content, actor=actor)
     except TimetableCsvError as error:

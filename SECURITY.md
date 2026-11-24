@@ -156,6 +156,43 @@ periods in a day, incoming pending substitutions are capped at five per
 candidate, and faculty cannot submit past absences or leave. These remaining
 items are not claimed as complete.
 
+## Phase 3: input handling, injection, XSS, and CSRF
+
+**Status: partial.** Jinja templates now use explicit autoescaping. All
+state-changing API routes require a double-submit CSRF token and a matching
+Origin or Referer; the browser templates send the token for fetch, HTMX, and
+form requests. A request-body middleware limits ordinary requests to 1 MiB and
+timetable-import requests to 2 MiB plus multipart overhead. Timetable imports
+require a `.csv` filename and `text/csv`, UTF-8 input, at most 5,000 rows,
+exact approved headers, bounded field lengths, and no control/format
+characters; CSV error messages do not echo submitted field contents. The
+existing transactional import remains all-or-nothing. Validation errors no
+longer include submitted values. CSV exports neutralize formula prefixes,
+including whitespace-prefixed formulas, tabs, carriage returns, and newlines.
+No `.ics` export or one-click action-link route exists in this checkout.
+
+Behavior changes: browser writes without a valid CSRF token and same-origin
+Origin/Referer are rejected; JSON requests over 1 MiB and timetable files over
+2 MiB are rejected; CSV imports with non-CSV metadata, over 5,000 rows,
+oversized fields, control characters, or non-UTF-8 data are rejected.
+
+Regression evidence: `test_every_unsafe_route_requires_csrf_validation`,
+`test_csrf_less_absence_post_is_rejected`,
+`test_cross_origin_absence_post_is_rejected`,
+`test_oversized_json_request_is_rejected`,
+`test_stored_user_content_is_html_escaped`,
+`test_import_rejects_oversized_csv_without_importing_rows`,
+`test_import_rejects_more_than_5000_rows_without_importing`,
+`test_import_requires_csv_filename_and_content_type`,
+`test_import_rejects_non_utf8_csv_without_importing_rows`,
+`test_csv_formula_prefixes_are_neutralized`, and
+`test_application_contains_no_string_built_sql`.
+
+Remaining Phase 3 work: exhaustive length/character validation for every
+user-facing string and a PostgreSQL-backed verification of import rollback.
+Inline scripts remain and strict nonce-based CSP and self-hosted browser
+dependencies are Phase 5 work. These controls are not claimed complete.
+
 ### OWASP Top 10 (2021) initial mapping
 
 | Category | Phase 0 status | Evidence / next step |

@@ -98,6 +98,7 @@
     try {
       const response = await fetch("/timetable/import", {
         method: "POST",
+        headers: { "X-CSRF-Token": window.classSwapCsrfToken() },
         body: new FormData(form),
         credentials: "same-origin"
       });

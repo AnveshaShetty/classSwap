@@ -132,6 +132,8 @@ def render_monthly_csv(report: dict[str, Any]) -> str:
 
 
 def _spreadsheet_safe(value: str) -> str:
-    if value.startswith(("=", "+", "-", "@")):
+    if value.startswith(("=", "+", "-", "@", "\t", "\r", "\n")) or value.lstrip(
+        " \t\r\n"
+    ).startswith(("=", "+", "-", "@")):
         return "'" + value
     return value

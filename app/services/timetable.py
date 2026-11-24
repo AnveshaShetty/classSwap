@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from io import BytesIO
+import unicodedata
 
 import pandas as pd
 from sqlalchemy import delete, select
@@ -23,6 +24,16 @@ CSV_COLUMNS = ("section", "day", "period", "subject", "faculty_email", "room")
 DAY_NUMBERS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5}
 DAY_NAMES = tuple(DAY_NUMBERS)
 PERIODS_PER_DAY = {day: (4 if day == "Sat" else 7) for day in DAY_NAMES}
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+MAX_IMPORT_ROWS = 5000
+CSV_FIELD_LENGTHS = {
+    "section": 60,
+    "day": 3,
+    "period": 2,
+    "subject": 150,
+    "faculty_email": 255,
+    "room": 80,
+}
 
 
 @dataclass(frozen=True)
@@ -53,6 +64,8 @@ class TimetableHistoryConflict(ValueError):
 
 
 def parse_timetable_csv(content: bytes) -> pd.DataFrame:
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise TimetableCsvError([{"row": 1, "message": "The CSV file exceeds the 2 MB limit."}])
     try:
         frame = pd.read_csv(
             BytesIO(content),
@@ -60,9 +73,13 @@ def parse_timetable_csv(content: bytes) -> pd.DataFrame:
             dtype=str,
             keep_default_na=False,
         )
-    except (UnicodeDecodeError, pd.errors.EmptyDataError, pd.errors.ParserError) as error:
+    except UnicodeDecodeError as error:
+        raise TimetableCsvError([{"row": 1, "message": "The CSV file must use UTF-8 encoding."}]) from error
+    except (pd.errors.EmptyDataError, pd.errors.ParserError) as error:
         raise TimetableCsvError([{"row": 1, "message": "Could not read the CSV file."}]) from error
 
+    if len(frame) > MAX_IMPORT_ROWS:
+        raise TimetableCsvError([{"row": 1, "message": "The CSV file cannot contain more than 5,000 rows."}])
     if tuple(frame.columns) != CSV_COLUMNS:
         raise TimetableCsvError([{
             "row": 1,
@@ -87,6 +104,12 @@ def _validate_rows(session: Session, frame: pd.DataFrame) -> list[TimetableRow]:
 
     for offset, raw in enumerate(frame.to_dict(orient="records"), start=2):
         row_errors: list[str] = []
+        for column, maximum_length in CSV_FIELD_LENGTHS.items():
+            value = raw[column]
+            if len(value) > maximum_length:
+                row_errors.append("%s exceeds the maximum length." % column)
+            if any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+                row_errors.append("%s contains unsupported control characters." % column)
         section_name = raw["section"].strip()
         day = raw["day"].strip()
         subject_name = raw["subject"].strip()
@@ -97,13 +120,13 @@ def _validate_rows(session: Session, frame: pd.DataFrame) -> list[TimetableRow]:
         person = faculty.get(faculty_email)
         room = rooms.get(room_name)
         if section is None:
-            row_errors.append("Unknown section '%s'." % section_name)
+            row_errors.append("Unknown section.")
         if subject is None:
-            row_errors.append("Unknown subject '%s'." % subject_name)
+            row_errors.append("Unknown subject.")
         if person is None:
-            row_errors.append("Unknown faculty email '%s'." % faculty_email)
+            row_errors.append("Unknown faculty email.")
         if room is None:
-            row_errors.append("Unknown room '%s'." % room_name)
+            row_errors.append("Unknown room.")
         if day not in DAY_NUMBERS:
             row_errors.append("Day must be Mon, Tue, Wed, Thu, Fri, or Sat.")
 

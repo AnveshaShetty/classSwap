@@ -40,7 +40,10 @@
     try {
       const response = await fetch("/absences", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.classSwapCsrfToken()
+        },
         credentials: "same-origin",
         body: JSON.stringify({ date: form.date.value, periods, reason: form.reason.value })
       });

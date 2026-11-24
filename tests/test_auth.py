@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.config import Settings, settings
 from app.core.dependencies import get_current_user, require_roles
+from tests.conftest import configure_csrf_client
 from app.database import Base, get_db
 from app.core.security import decode_access_token
 from app.main import app
@@ -44,6 +45,7 @@ def auth_client() -> Iterator[TestClient]:
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
         yield client
     app.dependency_overrides.clear()
     test_engine.dispose()
@@ -66,7 +68,7 @@ def test_login_sets_http_only_cookie_and_me_returns_user(auth_client: TestClient
 
 
 def test_invalid_credentials_and_missing_cookie_are_rejected(auth_client: TestClient) -> None:
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     invalid_login = auth_client.post(
         "/auth/login",
         json={"email": "ravi.kulal@demo.edu", "password": "wrong"},
@@ -75,6 +77,31 @@ def test_invalid_credentials_and_missing_cookie_are_rejected(auth_client: TestCl
 
     assert invalid_login.status_code == 401
     assert unauthenticated.status_code == 401
+
+
+def test_oversized_json_request_is_rejected(auth_client: TestClient) -> None:
+    body = b'{"email":"ravi@example.edu","password":"' + b"x" * (1024 * 1024) + b'"}'
+
+    response = auth_client.post(
+        "/auth/login",
+        content=body,
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Request body is too large."
+
+
+def test_validation_errors_do_not_echo_submitted_password(auth_client: TestClient) -> None:
+    password = "sensitive-value-" * 20
+
+    response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": password},
+    )
+
+    assert response.status_code == 422
+    assert password not in response.text
 
 
 def test_unknown_and_known_login_failures_have_same_response(auth_client: TestClient) -> None:
@@ -174,7 +201,7 @@ def test_login_cookie_is_secure_when_configured(auth_client: TestClient, monkeyp
 
 
 def test_logout_invalidates_previously_issued_token(auth_client: TestClient) -> None:
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     login = auth_client.post(
         "/auth/login",
         json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
@@ -190,7 +217,7 @@ def test_logout_invalidates_previously_issued_token(auth_client: TestClient) -> 
 
 
 def test_password_change_invalidates_old_token(auth_client: TestClient) -> None:
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     login = auth_client.post(
         "/auth/login",
         json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
@@ -209,7 +236,7 @@ def test_password_change_invalidates_old_token(auth_client: TestClient) -> None:
 
     assert change_response.status_code == 204
     assert auth_client.get("/me").status_code == 401
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     new_login = auth_client.post(
         "/auth/login",
         json={
@@ -290,7 +317,7 @@ def test_admin_actions_require_totp_or_a_single_use_backup_code(
         "totp_encryption_key",
         Fernet.generate_key().decode("ascii"),
     )
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     login = auth_client.post(
         "/auth/login",
         json={"email": "meera.shenoy@demo.edu", "password": "demo123"},
@@ -339,7 +366,7 @@ def test_super_admin_can_force_logout_user_with_totp(
     faculty_id = faculty_login.json()["id"]
     faculty_token = auth_client.cookies.get(settings.auth_cookie_name)
     assert faculty_login.status_code == 200 and faculty_token
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
 
     admin_login = auth_client.post(
         "/auth/login",
@@ -358,7 +385,7 @@ def test_super_admin_can_force_logout_user_with_totp(
         f"/admin/users/{faculty_id}/force-logout",
         headers={"X-TOTP-Code": pyotp.TOTP(secret).now()},
     )
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     auth_client.cookies.set(settings.auth_cookie_name, faculty_token)
 
     assert forced.status_code == 204

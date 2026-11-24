@@ -1,3 +1,4 @@
+import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -5,9 +6,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from starlette.routing import Mount
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.config import settings
+from app.core.body_limits import RequestBodyLimitMiddleware
+from app.core.csrf import CSRF_COOKIE_NAME
+from app.core.templating import templates
 from app.routes.absence import router as absence_router
 from app.routes.admin import router as admin_router
 from app.routes.auth import router as auth_router
@@ -17,9 +22,9 @@ from app.routes.timetable import router as timetable_router
 from app.routes.substitution import router as substitution_router
 
 app = FastAPI(title="ClassSwap")
+app.add_middleware(RequestBodyLimitMiddleware)
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(pages_router)
@@ -29,13 +34,36 @@ app.include_router(admin_router)
 app.include_router(substitution_router)
 
 for route in app.routes:
-    if isinstance(route, APIRoute) and route.path in {
+    if isinstance(route, Mount) or getattr(route, "name", None) in {
+        "openapi",
+        "swagger_ui_html",
+        "swagger_ui_redirect",
+        "redoc_html",
+    }:
+        setattr(route, "auth_policy", "public")
+    elif isinstance(route, APIRoute) and route.path in {
         "/docs",
         "/redoc",
         "/openapi.json",
         "/docs/oauth2-redirect",
     }:
         route.openapi_extra = {"x-auth-policy": "public"}
+
+
+@app.middleware("http")
+async def set_csrf_cookie(request: Request, call_next):
+    response = await call_next(request)
+    if request.method in {"GET", "HEAD"} and CSRF_COOKIE_NAME not in request.cookies:
+        response.set_cookie(
+            key=CSRF_COOKIE_NAME,
+            value=secrets.token_urlsafe(32),
+            httponly=False,
+            secure=settings.cookie_secure,
+            samesite="strict",
+            max_age=8 * 60 * 60,
+            path="/",
+        )
+    return response
 
 
 @app.get("/health", openapi_extra={"x-auth-policy": "public"})
@@ -90,9 +118,17 @@ async def http_error_page(request: Request, exc: StarletteHTTPException) -> HTML
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_page(request: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = [
+        {
+            "loc": error.get("loc", ()),
+            "msg": error.get("msg", "Invalid value."),
+            "type": error.get("type", "validation_error"),
+        }
+        for error in exc.errors()
+    ]
     return JSONResponse(
         status_code=422,
-        content={"detail": "Some submitted details need attention.", "errors": exc.errors()},
+        content={"detail": "Some submitted details need attention.", "errors": errors},
     )
 
 

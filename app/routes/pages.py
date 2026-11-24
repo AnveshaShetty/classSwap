@@ -1,15 +1,15 @@
 from datetime import date
-from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.authorization import can_access_absence
 from app.config import settings
+from app.core.csrf import require_csrf
 from app.core.dependencies import get_current_user
+from app.core.templating import templates
 from app.database import get_db
 from app.models import Section, Subject, Timetable, User
 from app.services.absence import AbsenceNotFound, get_absence
@@ -23,8 +23,7 @@ from app.services.substitution import (
 )
 
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 def _can_view_reports(session: Session, current_user: User) -> bool:

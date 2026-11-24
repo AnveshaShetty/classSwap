@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.csrf import require_csrf
 from app.core.dependencies import get_current_user, require_roles
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.totp import (
@@ -34,7 +35,7 @@ from app.services.auth import (
 from app.services.email import dispatch_password_reset_email
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 @router.post(

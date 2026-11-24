@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from tests.conftest import configure_csrf_client
 from app.config import settings
 from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
@@ -49,7 +50,8 @@ def dashboard_context() -> Iterator[tuple[TestClient, Engine, User]]:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: current_user
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
         yield client, test_engine, current_user
     app.dependency_overrides.clear()
     test_engine.dispose()
@@ -120,6 +122,38 @@ def test_dashboard_api_and_page_use_stored_absence_data(
     assert page.status_code == 200
     assert "Absence register" in page.text
     assert "Medical leave" in page.text
+
+
+def test_stored_user_content_is_html_escaped(
+    dashboard_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, current_user = dashboard_context
+    current_user.name = '<img src=x onerror="alert(1)">'
+    with Session(test_engine) as session:
+        timetable = session.scalar(
+            select(Timetable).where(
+                Timetable.faculty_id == current_user.id,
+                Timetable.day_of_week == 0,
+                Timetable.period_no == 3,
+            )
+        )
+        assert timetable is not None
+        session.add(Absence(
+            timetable_id=timetable.id,
+            faculty_id=current_user.id,
+            date=date(2026, 11, 30),
+            period_no=3,
+            reason='<script>alert("stored")</script>',
+        ))
+        session.commit()
+
+    response = client.get("/dashboard", params={"date": "2026-11-30"})
+
+    assert response.status_code == 200
+    assert '<img src=x onerror="alert(1)">' not in response.text
+    assert "&lt;img" in response.text
+    assert '<script>alert("stored")</script>' not in response.text
+    assert "&lt;script&gt;" in response.text
 
 
 def test_monthly_report_csv_contains_seeded_rows_and_statuses(
