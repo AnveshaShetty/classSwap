@@ -1,0 +1,105 @@
+# ClassSwap Security
+
+## Phase 0: threat model and baseline audit
+
+This is an initial repository review, not a penetration test or a certification
+of OWASP ASVS compliance. Findings are based on the code and checks listed
+below, as of 2026-11-24. Do not use real faculty or student data until the
+high-risk findings and the residual risks have been addressed and independently
+validated.
+
+### Assets
+
+- Faculty, HOD, acting-admin, and super-admin accounts and credentials
+- JWT signing keys and browser session cookies
+- Timetable integrity, absence records, leave data, and substitution decisions
+- Admin-chain membership and acting-admin decisions
+- Audit history and operational database contents
+- Public timetable availability and the confidentiality of non-public faculty data
+- Uploaded CSV data and exported CSV/calendar content
+
+### Actors
+
+- Anonymous visitor or student using public timetable pages
+- Authenticated faculty member
+- Stand-in acting administrator, HOD, or super administrator
+- Malicious or compromised insider
+- Automated bot or network attacker
+- Compromised dependency publisher, CDN, or deployment host
+
+### Trust boundaries
+
+- Untrusted browser and network traffic ↔ FastAPI routes and authentication
+- Route handlers and application services ↔ PostgreSQL or test SQLite database
+- Faculty/admin authorization ↔ records selected by client-supplied identifiers
+- Uploaded CSV ↔ import parser and persistent timetable data
+- Public timetable and export responses ↔ external clients and spreadsheets
+- Browser ↔ third-party JavaScript, CSS, and font providers
+- Source dependencies and container build ↔ deployed runtime
+
+### Abuse cases
+
+1. A faculty member guesses another faculty member's absence ID and reads
+   suggestions or available rooms, or creates/responds to a request for it.
+2. A substitution candidate accepts a request addressed to another person.
+3. A stand-in or ordinary faculty account invokes a timetable import or changes
+   the admin chain through a direct route rather than the UI.
+4. A caller supplies another department to retrieve its acting administrator.
+5. An attacker uses a known/default signing key to forge a JWT for an admin.
+6. A network attacker intercepts a cookie where the app is served over HTTP or
+   where the cookie is not marked Secure.
+7. An attacker replays an emailed or Telegram action link, scrapes public
+   schedules for personal data, or uses a poisoned CSV to alter scheduling data.
+8. A compromised CDN script executes in an authenticated browser session.
+9. A malicious insider alters audit records or exports formula-active CSV data.
+
+### Phase 0 findings
+
+| # | Severity | File | Lines | Vulnerability | Confidence |
+|---|----------|------|-------|---------------|------------|
+| 1 | HIGH | `app/config.py`, `docker-compose.yml` | 8; 22 | A known fallback JWT signing key can allow token forgery when deployed without an explicit secret. | 10/10 |
+| 2 | MEDIUM | `app/config.py`, `app/routes/auth.py` | 12; 33 | The cookie security setting defaults to false and the default deployment uses HTTP. | 9/10 |
+| 3 | MEDIUM | `app/routes/absence.py`, `app/routes/substitution.py`, `app/routes/pages.py`, `app/services/absence.py`, `app/services/suggestion.py` | 46–54; 82–90; 137–145; 102–103; 160–161 | Authenticated routes load absence-related data by ID without consistently checking its owner/department, enabling IDOR/BOLA. | 10/10 |
+| 4 | MEDIUM | `app/routes/admin.py` | 31–45 | An authenticated caller can select another department when retrieving its acting administrator. | 9/10 |
+| 5 | MEDIUM | `app/templates/base.html` | 13–14 | External JavaScript assets are loaded without Subresource Integrity. | 8/10 |
+
+Planned fixes: fail closed on missing/placeholder signing secrets; enforce
+production cookie and transport settings; centralize and enforce object-level
+authorization; scope acting-admin lookups; and self-host or integrity-pin
+third-party scripts.
+
+### OWASP Top 10 (2021) initial mapping
+
+| Category | Phase 0 status | Evidence / next step |
+|---|---|---|
+| A01 Broken Access Control | Findings | Findings 3–4; centralize policy and add ownership/role regression tests. |
+| A02 Cryptographic Failures | Finding | Finding 1; remove signing-key fallback and validate production configuration. |
+| A03 Injection | Not assessed exhaustively | Run targeted query review and add input/injection regression tests. |
+| A04 Insecure Design | Partial | Abuse cases above; review action-link, state-transition, and concurrency design. |
+| A05 Security Misconfiguration | Finding | Findings 1–2; secure deployment defaults, headers, host, CORS, and docs configuration. |
+| A06 Vulnerable and Outdated Components | Finding | pip-audit reported a pytest advisory; confirm/fix while preserving supported constraints. |
+| A07 Identification and Authentication Failures | Findings | Findings 1–2; test authentication, lockout, session invalidation, reset, and MFA behavior. |
+| A08 Software and Data Integrity Failures | Finding | Finding 5; pin or self-host browser dependencies and review CI/build integrity. |
+| A09 Security Logging and Monitoring Failures | Not assessed exhaustively | Review audit immutability, security-event coverage, and secret redaction. |
+| A10 Server-Side Request Forgery | Not assessed exhaustively | Search for server-side requests and validate any user-controlled destinations. |
+
+### Scanner and test baseline
+
+- Bandit: `python -m bandit -q -r app scripts migrations data` scanned 3,573
+  lines and reported two Low `B311` pseudo-random-generator findings in
+  `data/gen_data.py` (lines 192 and 391); no Medium or High findings. Exit 1.
+- pip-audit: `python -m pip_audit -r requirements.txt` reported pytest 8.4.2
+  (`PYSEC-2026-1845`), with pytest 9.0.3 reported as the fixed version. Exit 1.
+- Semgrep: `p/python`, `p/fastapi`, and `p/jinja2` were not run because no
+  usable Semgrep CLI was available in the environment.
+- Baseline pytest: 38 passed and one failed. The failure is a stale hard-coded
+  cookie-name expectation in `tests/test_auth.py`; the configured app issues
+  `__Host-classswap_session`.
+
+### Scope and residual risk
+
+This phase is a code/configuration snapshot only. It does not prove that every
+route, workflow, deployment setting, or dependency is secure. No production
+penetration test, ZAP scan, Semgrep scan, container scan, or independent review
+has been completed. Phase status and further evidence must be updated as fixes
+and tests are implemented.

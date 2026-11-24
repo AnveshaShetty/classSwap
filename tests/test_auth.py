@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.config import settings
 from app.core.dependencies import get_current_user, require_roles
 from app.database import Base, get_db
 from app.main import app
@@ -47,7 +48,7 @@ def test_login_sets_http_only_cookie_and_me_returns_user(auth_client: TestClient
     assert response.json()["email"] == "ravi.kulal@demo.edu"
     assert "access_token" not in response.json()
     set_cookie = response.headers["set-cookie"].lower()
-    assert "classswap_access=" in set_cookie
+    assert f"{settings.auth_cookie_name.lower()}=" in set_cookie
     assert "httponly" in set_cookie
     assert "samesite=lax" in set_cookie
     assert auth_client.get("/me").json()["role"] == "faculty"
