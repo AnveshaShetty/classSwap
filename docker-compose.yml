@@ -25,6 +25,12 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-__Host-classswap_session}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-ClassSwap <no-reply@classswap.local>}
     ports:
       - "8000:8000"
     depends_on:

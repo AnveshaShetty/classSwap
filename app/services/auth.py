@@ -1,5 +1,7 @@
 import hashlib
+import hmac
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -11,7 +13,7 @@ from app.core.security import (
     password_hash_needs_update,
     verify_password,
 )
-from app.models import LoginAttempt, User
+from app.models import LoginAttempt, PasswordResetToken, User
 
 
 logger = logging.getLogger(__name__)
@@ -94,6 +96,80 @@ def _record_failure(
 def _clear_attempts(session: Session, attempts: list[LoginAttempt]) -> None:
     for attempt in attempts:
         session.delete(attempt)
+
+
+def create_password_reset_token(
+    session: Session,
+    email: str,
+) -> tuple[str, str] | None:
+    normalized_email = email.strip().lower()
+    user = session.scalar(select(User).where(User.email == normalized_email))
+    if user is None:
+        return None
+
+    now = _now_utc()
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    previous_tokens = session.scalars(
+        select(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .with_for_update()
+    )
+    for previous in previous_tokens:
+        previous.used_at = now
+    session.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=now + timedelta(minutes=15),
+        )
+    )
+    session.commit()
+    return user.email, token
+
+
+def consume_password_reset_token(
+    session: Session,
+    token: str,
+    new_password: str,
+) -> bool:
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    reset = session.scalar(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash)
+        .with_for_update()
+    )
+    if (
+        reset is None
+        or not hmac.compare_digest(reset.token_hash, token_hash)
+        or reset.used_at is not None
+        or _as_utc(reset.expires_at) <= _now_utc()
+    ):
+        return False
+
+    user = session.get(User, reset.user_id)
+    if user is None:
+        return False
+    validate_new_password(new_password, user.name, user.email)
+    now = _now_utc()
+    reset.used_at = now
+    user.password_hash = hash_password(new_password)
+    user.must_change_password = False
+    user.token_version += 1
+    for previous in session.scalars(
+        select(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .with_for_update()
+    ):
+        previous.used_at = now
+    session.commit()
+    return True
 
 
 def authenticate_user(

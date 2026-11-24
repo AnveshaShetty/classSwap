@@ -6,7 +6,7 @@ import jwt
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from passlib.context import CryptContext
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -15,8 +15,12 @@ from app.core.dependencies import get_current_user, require_roles
 from app.database import Base, get_db
 from app.core.security import decode_access_token
 from app.main import app
-from app.models import User
-from app.services.auth import authenticate_user
+from app.models import PasswordResetToken, User
+from app.services.auth import (
+    authenticate_user,
+    consume_password_reset_token,
+    create_password_reset_token,
+)
 from scripts.seed import load_seed
 
 
@@ -214,6 +218,67 @@ def test_password_change_invalidates_old_token(auth_client: TestClient) -> None:
     assert new_login.status_code == 200
 
 
+def test_reset_token_is_hashed_single_use_and_expires() -> None:
+    test_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(test_engine)
+    with Session(test_engine) as session:
+        user = User(
+            name="Reset User",
+            email="one@demo.edu",
+            password_hash=CryptContext(schemes=["argon2"]).hash("old-password"),
+            role="faculty",
+            department="Computer Science and Design",
+            teaches=True,
+        )
+        session.add(user)
+        session.commit()
+
+        _, token = create_password_reset_token(session, user.email)
+        stored = session.scalar(
+            select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+        assert stored is not None
+        assert stored.token_hash != token
+        assert len(stored.token_hash) == 64
+        assert consume_password_reset_token(session, token, "SecureResetPassphrase2026!") is True
+        assert consume_password_reset_token(session, token, "AnotherSecurePassphrase2026!") is False
+
+        _, expired_token = create_password_reset_token(session, user.email)
+        expired = session.scalar(
+            select(PasswordResetToken)
+            .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+        )
+        assert expired is not None
+        expired.expires_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        session.commit()
+        assert consume_password_reset_token(
+            session,
+            expired_token,
+            "ExpiredResetPassphrase2026!",
+        ) is False
+    test_engine.dispose()
+
+
+def test_password_reset_request_does_not_disclose_email_existence(
+    auth_client: TestClient,
+) -> None:
+    known = auth_client.post(
+        "/auth/password-reset/request",
+        json={"email": "ravi.kulal@demo.edu"},
+    )
+    unknown = auth_client.post(
+        "/auth/password-reset/request",
+        json={"email": "unknown-reset@demo.edu"},
+    )
+
+    assert known.status_code == unknown.status_code == 202
+    assert known.json() == unknown.json()
+
+
 def test_tokens_reject_none_and_non_hs256_algorithms() -> None:
     now = int(datetime.now(timezone.utc).timestamp())
     claims = {
@@ -243,6 +308,17 @@ def test_production_settings_reject_unsafe_jwt_secret(secret: str) -> None:
             ENV="production",
             JWT_SECRET_KEY=secret,
             COOKIE_SECURE=True,
+        )
+
+
+def test_production_settings_require_reset_email_and_https_origin() -> None:
+    with pytest.raises(ValueError, match="SMTP_HOST"):
+        Settings(
+            _env_file=None,
+            ENV="production",
+            JWT_SECRET_KEY="sufficiently-long-random-production-key-value",
+            COOKIE_SECURE=True,
+            APP_BASE_URL="https://classswap.example",
         )
 
 

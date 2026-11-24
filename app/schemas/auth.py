@@ -13,6 +13,19 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=1, max_length=256)
 
 
+class PasswordResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=43, max_length=128)
+    new_password: str = Field(min_length=1, max_length=256)
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

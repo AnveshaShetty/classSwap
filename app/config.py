@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     auth_cookie_name: str = "__Host-classswap_session"
     cookie_secure: bool = True
+    app_base_url: str = "http://localhost:8000"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_address: str = "ClassSwap <no-reply@classswap.local>"
     max_period: int = 7
     break_after: str = "2,4"
     subject_match_weight: float = 0.35
@@ -56,6 +62,10 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires Secure authentication cookies.")
             if not self.auth_cookie_name.startswith("__Host-"):
                 raise ValueError("Production authentication cookies must use the __Host- prefix.")
+            if not self.smtp_host:
+                raise ValueError("Production requires SMTP_HOST for password-reset delivery.")
+            if not self.app_base_url.startswith("https://"):
+                raise ValueError("Production requires an HTTPS APP_BASE_URL.")
         return self
 
     @property

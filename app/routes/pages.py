@@ -50,6 +50,15 @@ def login_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="reset_password.html",
+        context={"request": request},
+    )
+
+
 @router.get("/absence/new", response_class=HTMLResponse)
 def absence_form(
     request: Request,

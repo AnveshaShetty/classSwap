@@ -77,7 +77,10 @@ database-backed per-account/per-IP lockout, password policy validation and
 change, 30-minute sliding sessions with an eight-hour absolute lifetime, and
 server-side logout/password-change invalidation via `token_version`. The seed
 command is disabled in production; development seed accounts are marked
-`must_change_password`.
+`must_change_password`. Password-reset tokens are 256-bit random values stored
+only as SHA-256 hashes, expire after 15 minutes, are single-use, invalidate
+sessions, and are delivered through a fixed-From SMTP message. Production
+startup requires SMTP and an HTTPS reset-link origin.
 
 Regression evidence: `test_production_settings_reject_unsafe_jwt_secret`,
 `test_login_cookie_is_secure_when_configured`,
@@ -86,9 +89,11 @@ Regression evidence: `test_production_settings_reject_unsafe_jwt_secret`,
 `test_legacy_bcrypt_hash_is_upgraded_after_successful_login`,
 `test_logout_invalidates_previously_issued_token`,
 `test_password_change_invalidates_old_token`,
+`test_reset_token_is_hashed_single_use_and_expires`,
+`test_password_reset_request_does_not_disclose_email_existence`,
 `test_tokens_reject_none_and_non_hs256_algorithms`,
 `test_seed_refuses_production_mode`, and
-`test_seed_loads_all_csvs_in_dependency_order`. Full suite: 53 passed.
+`test_seed_loads_all_csvs_in_dependency_order`. Full suite: 56 passed.
 
 Behavior changes: `/logout` is no longer a state-changing GET; use the POST
 `/auth/logout` form. Production now fails closed for missing/placeholder
@@ -97,10 +102,9 @@ Secure, which requires HTTPS (localhost is typically treated as a secure
 context by browsers). Successful password changes revoke existing sessions.
 Five failed attempts trigger a 15-minute lockout with exponential backoff.
 
-Still open in this phase: password-reset email/token workflow, TOTP enrollment
-and enforcement for privileged roles, and admin-driven force logout. These
-must be implemented and regression-tested before Phase 1 can be considered
-complete.
+Still open in this phase: TOTP enrollment and enforcement for privileged
+roles, and admin-driven force logout. These must be implemented and
+regression-tested before Phase 1 can be considered complete.
 
 ### OWASP Top 10 (2021) initial mapping
 
