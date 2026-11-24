@@ -5,13 +5,13 @@
 <header class="page-heading">
   <div><p class="eyebrow">Schedule change</p><h1>Record an absence</h1><p class="subtitle">Select the date and periods you will miss. Eligible cover options will follow.</p></div>
 </header>
-<section class="panel" style="max-width: 720px">
+<section class="panel max-width-720">
   <form id="absence-form" class="form-grid">
     <label class="field" for="absence-date">Date
       <input id="absence-date" name="date" type="date" value="{{ today|default('') }}" required>
     </label>
-    <fieldset style="border: 0; margin: 0; padding: 0">
-      <legend class="field" style="margin-bottom: 8px">Periods</legend>
+    <fieldset class="fieldset-reset">
+      <legend class="field legend-spacing">Periods</legend>
       <div class="period-grid">
         {% for period in range(1, max_period + 1) %}
         <label class="period-option"><input type="checkbox" name="periods" value="{{ period }}"> Period {{ period }}</label>
@@ -26,10 +26,10 @@
       </select>
     </label>
     <div id="absence-message" role="status" aria-live="polite"></div>
-    <button class="button" type="submit" style="align-self: start">Find substitutes</button>
+    <button class="button button-start" type="submit">Find substitutes</button>
   </form>
 </section>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   document.getElementById("absence-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;

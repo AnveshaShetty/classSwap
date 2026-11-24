@@ -10,7 +10,7 @@
   </div>
 </header>
 
-<section class="panel" style="margin-bottom: 18px">
+<section class="panel panel-spacing">
   <form class="filter-bar" method="get" action="/timetable">
     <label class="field" for="section-filter">Section
       <select id="section-filter" name="section">
@@ -36,7 +36,7 @@
 </section>
 
 {% if can_import %}
-<section class="panel" style="margin-bottom: 18px">
+<section class="panel panel-spacing">
   <header class="panel-heading">
     <div><h2>Import timetable</h2><p class="panel-description">CSV columns: section, day, period, subject, faculty_email, room.</p></div>
   </header>
@@ -56,7 +56,7 @@
     <span class="status accepted">Coverage date · {{ selected_date.isoformat() }}</span>
   </header>
   <div class="table-wrap">
-    <table style="min-width: 920px">
+    <table class="table-wide">
       <thead>
         <tr><th>Day</th>{% for period in range(1, 8) %}<th>Period {{ period }}</th>{% endfor %}</tr>
       </thead>
@@ -65,30 +65,30 @@
         <tr>
           <td><strong>{{ day.name }}</strong></td>
           {% for period in day.periods %}
-          <td style="min-width: 125px; vertical-align: top">
+          <td class="timetable-cell">
             {% for entry in period.entries %}
-            <article data-section="{{ entry.section }}" style="background: #f7faf8; border: 1px solid #e8efeb; border-radius: 9px; margin-bottom: 5px; padding: 8px">
-              <strong style="display: block; font-size: 11px">{{ entry.subject }}</strong>
+            <article class="timetable-entry" data-section="{{ entry.section }}">
+              <strong class="timetable-subject">{{ entry.subject }}</strong>
               <span class="table-status">{{ entry.section }} · {{ entry.faculty }}</span>
-              <span class="table-status" style="display: block">{{ entry.room }}</span>
-              {% if entry.substituted %}<span class="status accepted" style="margin-top: 6px">Substitute accepted</span>{% endif %}
+              <span class="table-status timetable-room">{{ entry.room }}</span>
+              {% if entry.substituted %}<span class="status accepted substitute-status">Substitute accepted</span>{% endif %}
             </article>
             {% else %}
             <span class="table-status">—</span>
             {% endfor %}
           </td>
           {% endfor %}
-          {% for _ in range(7 - day.periods|length) %}<td style="background: #fafbfa"></td>{% endfor %}
+          {% for _ in range(7 - day.periods|length) %}<td class="blank-cell"></td>{% endfor %}
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="panel-description" style="margin-top: 12px">Saturday uses four periods; remaining cells are intentionally blank.</p>
+  <p class="panel-description description-spacing">Saturday uses four periods; remaining cells are intentionally blank.</p>
 </section>
 
 {% if can_import %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   document.getElementById("timetable-import-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;

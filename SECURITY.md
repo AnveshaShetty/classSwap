@@ -190,8 +190,9 @@ Regression evidence: `test_every_unsafe_route_requires_csrf_validation`,
 
 Remaining Phase 3 work: exhaustive length/character validation for every
 user-facing string and a PostgreSQL-backed verification of import rollback.
-Inline scripts remain and strict nonce-based CSP and self-hosted browser
-dependencies are Phase 5 work. These controls are not claimed complete.
+Inline scripts remain and are authorized by the per-response nonce-based
+content security policy implemented in Phase 5; browser dependencies use
+integrity-pinned CDN assets. These controls are not claimed complete.
 
 ## Phase 4: public surface, tokens, and abuse protection
 
@@ -216,6 +217,43 @@ scans; migrate rate-limit state to Redis or another shared service for
 multi-worker deployments; and add notification delivery limits if those
 features are introduced. The in-memory limiter is process-local and is not
 sufficient as the sole production DDoS control.
+
+## Phase 5: transport, headers, and configuration
+
+**Status: partial.** Responses now receive a nonce-based Content Security
+Policy with no `unsafe-inline` or `unsafe-eval`; inline scripts and the shared
+stylesheet carry the per-request nonce, and templates contain no inline style
+attributes. The two CDN-hosted browser libraries are version-pinned and use
+SRI. Other response headers include HSTS in production, `nosniff`,
+Referrer-Policy, Permissions-Policy, COOP, and frame restrictions.
+Authenticated responses are marked `Cache-Control: no-store`; the Server
+header is removed. CORS is deny-by-default with explicit configured origins,
+and TrustedHostMiddleware rejects unlisted hosts. Production settings require
+HTTPS base URL, a strong non-placeholder JWT secret, secure `__Host-` cookies,
+DEBUG off, explicit hosts, PostgreSQL with `sslmode=require`, SMTP, and a valid
+TOTP encryption key; API docs are disabled in production. Docker/Uvicorn use a
+configurable forwarded-IP trust list and disable the Server header.
+
+Behavior changes: inline style attributes were replaced with stylesheet
+classes to enforce the stricter style policy. Dashboard chart bar heights are
+rounded to the nearest 5% to avoid dynamic inline styles. Production requests
+are redirected to HTTPS and API documentation endpoints are unavailable.
+
+Regression evidence: `test_security_headers_and_csp_nonce_are_present`,
+`test_templates_use_nonce_styles_without_inline_style_attributes`,
+`test_authenticated_responses_are_not_cached`,
+`test_production_responses_include_hsts`,
+`test_unknown_cors_origin_is_rejected`,
+`test_untrusted_host_is_rejected`,
+`test_production_settings_require_hardened_transport_and_database`,
+`test_production_disables_api_documentation`, and
+`test_production_database_requires_ssl_and_non_local_host`.
+
+Remaining Phase 5 work: validate HTTPS redirect and trusted-proxy behavior
+in the production container behind the actual ingress; document and exercise
+the deployment-specific allowed-host/CORS configuration; and consider
+self-hosting the integrity-pinned frontend assets to remove the CDN dependency.
+Do not treat these code-level tests as proof of deployment transport security.
 
 ### OWASP Top 10 (2021) initial mapping
 

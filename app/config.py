@@ -1,8 +1,11 @@
 from typing import Literal
+from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.exc import ArgumentError
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -17,6 +20,7 @@ class Settings(BaseSettings):
         default="development",
         validation_alias="ENV",
     )
+    debug: bool = False
     database_url: str = "postgresql+psycopg://classswap:classswap@localhost:5432/classswap"
     jwt_secret_key: str = ""
     jwt_algorithm: Literal["HS256"] = "HS256"
@@ -24,6 +28,9 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "__Host-classswap_session"
     cookie_secure: bool = True
     app_base_url: str = "http://localhost:8000"
+    allowed_hosts: str = ""
+    cors_allowed_origins: str = ""
+    trusted_proxy_ips: str = Field(default="127.0.0.1", validation_alias="FORWARDED_ALLOW_IPS")
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
@@ -44,6 +51,24 @@ class Settings(BaseSettings):
             raise ValueError("Access tokens must expire within 30 minutes.")
         if self.auth_cookie_name.startswith("__Host-") and not self.cookie_secure:
             raise ValueError("__Host- authentication cookies require Secure.")
+        if "*" in self.allowed_host_list:
+            raise ValueError("ALLOWED_HOSTS cannot contain a wildcard.")
+        if "*" in self.cors_origin_list:
+            raise ValueError("CORS_ALLOWED_ORIGINS cannot contain a wildcard.")
+        if "*" in self.trusted_proxy_list:
+            raise ValueError("FORWARDED_ALLOW_IPS cannot contain a wildcard.")
+        for origin in self.cors_origin_list:
+            parsed_origin = urlsplit(origin)
+            if (
+                parsed_origin.scheme not in {"http", "https"}
+                or not parsed_origin.netloc
+                or parsed_origin.path
+                or parsed_origin.query
+                or parsed_origin.fragment
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+            ):
+                raise ValueError("CORS_ALLOWED_ORIGINS must contain only explicit origins.")
         if self.environment == "production":
             secret = self.jwt_secret_key
             placeholders = (
@@ -68,11 +93,38 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires SMTP_HOST for password-reset delivery.")
             if not self.app_base_url.startswith("https://"):
                 raise ValueError("Production requires an HTTPS APP_BASE_URL.")
+            if self.debug:
+                raise ValueError("Production requires DEBUG=false.")
+            local_hosts = {"localhost", "127.0.0.1", "::1", "testserver"}
+            if not self.allowed_host_list or all(
+                host.lower() in local_hosts for host in self.allowed_host_list
+            ):
+                raise ValueError("Production requires an explicit ALLOWED_HOSTS list.")
+            try:
+                database = make_url(self.database_url)
+            except (ArgumentError, TypeError, ValueError) as error:
+                raise ValueError("Production requires a valid PostgreSQL DATABASE_URL.") from error
+            if database.get_backend_name() != "postgresql":
+                raise ValueError("Production requires PostgreSQL; SQLite is not supported.")
+            if database.query.get("sslmode") != "require":
+                raise ValueError("Production PostgreSQL connections require sslmode=require.")
             try:
                 Fernet(self.totp_encryption_key.encode("ascii"))
             except (UnicodeEncodeError, ValueError, TypeError) as error:
                 raise ValueError("Production requires a valid TOTP_ENCRYPTION_KEY.") from error
         return self
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [host.strip() for host in self.allowed_hosts.split(",") if host.strip()]
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+
+    @property
+    def trusted_proxy_list(self) -> list[str]:
+        return [proxy.strip() for proxy in self.trusted_proxy_ips.split(",") if proxy.strip()]
 
     @property
     def break_periods(self) -> tuple[int, ...]:

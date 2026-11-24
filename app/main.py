@@ -6,6 +6,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.routing import Mount
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -22,8 +25,32 @@ from app.routes.pages import router as pages_router
 from app.routes.timetable import router as timetable_router
 from app.routes.substitution import router as substitution_router
 
-app = FastAPI(title="ClassSwap")
+def api_docs_urls(environment: str) -> dict[str, str | None]:
+    if environment == "production":
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+app = FastAPI(
+    title="ClassSwap",
+    debug=settings.debug,
+    **api_docs_urls(settings.environment),
+)
 app.add_middleware(RequestBodyLimitMiddleware)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.allowed_host_list or ["localhost", "127.0.0.1", "testserver"],
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "X-TOTP-Code"],
+    expose_headers=["Retry-After"],
+)
+if settings.environment == "production":
+    app.add_middleware(HTTPSRedirectMiddleware)
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 app.include_router(auth_router)
@@ -72,6 +99,36 @@ async def set_csrf_cookie(request: Request, call_next):
             max_age=8 * 60 * 60,
             path="/",
         )
+    return response
+
+
+@app.middleware("http")
+async def set_security_headers(request: Request, call_next):
+    nonce = secrets.token_urlsafe(18)
+    request.state.csp_nonce = nonce
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'nonce-%s' https://unpkg.com; "
+        "style-src 'self' 'nonce-%s'; "
+        "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
+        "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    ) % (nonce, nonce)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["X-Frame-Options"] = "DENY"
+    if settings.environment == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    auth_cookie = settings.auth_cookie_name + "="
+    if (
+        settings.auth_cookie_name in request.cookies
+        or any(cookie.startswith(auth_cookie) for cookie in response.headers.getlist("set-cookie"))
+    ):
+        response.headers["Cache-Control"] = "no-store"
+    if "server" in response.headers:
+        del response.headers["server"]
     return response
 
 

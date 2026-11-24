@@ -75,7 +75,7 @@
             <tr>
               <td>
                 <strong>{{ item.section }}</strong><span class="table-status"> · {{ item.subject }}</span>
-                <span class="table-status" style="display: block">{{ item.reason }}</span>
+                <span class="table-status reason-text">{{ item.reason }}</span>
               </td>
               <td>{{ item.faculty }}</td>
               <td>{{ item.period }}</td>
@@ -110,7 +110,7 @@
         {% for day in coverage_trend %}
         <div class="chart-day" title="{{ day.date }}: {{ day.count }} accepted">
           <span class="chart-count">{{ day.count }}</span>
-          <span class="chart-track"><span class="chart-bar" style="height: {{ (day.count * 100 / trend_max) if trend_max else 0 }}%"></span></span>
+          <span class="chart-track"><span class="chart-bar chart-bar-{{ ((day.count * 20 / trend_max)|round|int * 5) if trend_max else 0 }}"></span></span>
           <span>{{ day.label }}</span>
         </div>
         {% endfor %}

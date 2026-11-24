@@ -10,7 +10,7 @@
 <section id="suggestion-list" class="card-list" aria-live="polite">
   <div class="panel empty-state"><span class="empty-icon" aria-hidden="true">↻</span><div class="empty-title">Finding eligible faculty…</div></div>
 </section>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   const absenceId = {{ absence.id }};
   const list = document.getElementById("suggestion-list");
   const message = document.getElementById("suggestion-message");
