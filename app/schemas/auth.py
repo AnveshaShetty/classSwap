@@ -26,6 +26,12 @@ class PasswordResetConfirm(BaseModel):
     new_password: str = Field(min_length=1, max_length=256)
 
 
+class TotpCodeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(pattern=r"^\d{6}$")
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
