@@ -3,7 +3,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_acting_admin, require_admin_mfa, require_roles
+from app.core.authorization import can_access_department, can_edit_admin_chain
+from app.core.dependencies import (
+    get_current_user,
+    require_acting_admin,
+    require_admin_mfa,
+    require_policy,
+    require_roles,
+)
 from app.database import get_db
 from app.models import User
 from app.schemas.admin import (
@@ -35,6 +42,8 @@ def read_acting_admin(
     session: Session = Depends(get_db),
 ) -> ActingAdminRead:
     target_department = department or current_user.department
+    if not can_access_department(current_user, target_department):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Acting administrator not found.")
     try:
         user, position = get_acting_admin(session, target_department, date.today())
     except AdminNotFound as error:
@@ -69,11 +78,8 @@ def get_admin_chain(
     session: Session = Depends(get_db),
 ) -> AdminChainRead:
     target_department = department or current_user.department
-    if current_user.role != "super_admin" and target_department != current_user.department:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your department's admin chain.",
-        )
+    if not can_access_department(current_user, target_department):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin chain not found.")
     entries = read_admin_chain(session, target_department)
     return AdminChainRead(
         department=target_department,
@@ -92,7 +98,8 @@ def get_admin_chain(
 @router.put("/admin/chain", response_model=AdminChainRead)
 def update_admin_chain(
     payload: AdminChainUpdate,
-    current_user: User = Depends(require_acting_admin("chain")),
+    current_user: User = Depends(require_policy(can_edit_admin_chain)),
+    _: User = Depends(require_admin_mfa),
     session: Session = Depends(get_db),
 ) -> AdminChainRead:
     try:

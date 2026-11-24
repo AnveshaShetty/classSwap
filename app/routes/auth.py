@@ -37,7 +37,11 @@ from app.services.email import dispatch_password_reset_email
 router = APIRouter()
 
 
-@router.post("/auth/login", response_model=UserRead)
+@router.post(
+    "/auth/login",
+    response_model=UserRead,
+    openapi_extra={"x-auth-policy": "public"},
+)
 def login(
     credentials: LoginRequest,
     request: Request,
@@ -103,7 +107,11 @@ def change_password(
     response.delete_cookie(settings.auth_cookie_name, path="/")
 
 
-@router.post("/auth/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/auth/password-reset/request",
+    status_code=status.HTTP_202_ACCEPTED,
+    openapi_extra={"x-auth-policy": "public"},
+)
 def request_password_reset(
     payload: PasswordResetRequest,
     background_tasks: BackgroundTasks,
@@ -117,7 +125,11 @@ def request_password_reset(
     }
 
 
-@router.post("/auth/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/auth/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra={"x-auth-policy": "public"},
+)
 def confirm_password_reset(
     payload: PasswordResetConfirm,
     session: Session = Depends(get_db),

@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.core.authorization import can_access_absence
 from app.config import settings
 from app.core.dependencies import get_current_user
 from app.database import get_db
@@ -36,12 +37,12 @@ def _can_view_reports(session: Session, current_user: User) -> bool:
     return acting_admin.id == current_user.id
 
 
-@router.get("/", include_in_schema=False)
+@router.get("/", include_in_schema=False, openapi_extra={"x-auth-policy": "public"})
 def home() -> RedirectResponse:
     return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.get("/login", response_class=HTMLResponse)
+@router.get("/login", response_class=HTMLResponse, openapi_extra={"x-auth-policy": "public"})
 def login_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
@@ -50,7 +51,7 @@ def login_page(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/reset-password", response_class=HTMLResponse)
+@router.get("/reset-password", response_class=HTMLResponse, openapi_extra={"x-auth-policy": "public"})
 def reset_password_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
@@ -147,6 +148,9 @@ def suggestions_page(
         absence = get_absence(session, absence_id)
     except AbsenceNotFound as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    owner = session.get(User, absence.faculty_id)
+    if not can_access_absence(current_user, absence, owner):
+        raise HTTPException(status_code=404, detail="Absence not found.")
     timetable = session.get(Timetable, absence.timetable_id)
     section = session.get(Section, timetable.section_id) if timetable is not None else None
     subject = session.get(Subject, timetable.subject_id) if timetable is not None else None

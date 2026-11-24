@@ -2,8 +2,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=256)
 
 
 class PasswordChangeRequest(BaseModel):

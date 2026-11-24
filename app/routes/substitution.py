@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.authorization import can_access_absence
 from app.core.dependencies import get_current_user
 from app.database import get_db
-from app.models import Substitution, User
+from app.models import Absence, Substitution, User
 from app.schemas.substitution import (
     FreeRoomRead,
     InboxItemRead,
@@ -81,10 +82,14 @@ def read_inbox(
 @router.get("/rooms/free", response_model=list[FreeRoomRead])
 def read_free_rooms(
     absence_id: int,
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
 ) -> list[FreeRoomRead]:
     try:
+        absence = session.get(Absence, absence_id)
+        owner = session.get(User, absence.faculty_id) if absence is not None else None
+        if absence is None or not can_access_absence(current_user, absence, owner):
+            raise SubstitutionNotFound("Absence not found.")
         return [
             FreeRoomRead.model_validate(room)
             for room in find_free_rooms(session, absence_id)

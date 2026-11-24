@@ -7,6 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.authorization import can_access_department
 from app.models import (
     Absence,
     AdminChain,
@@ -122,7 +123,7 @@ def replace_admin_chain(
         raise AdminConflict("Positions and faculty emails must be unique.")
 
     def replace() -> list[tuple[AdminChain, User]]:
-        if actor.role != "super_admin" and actor.department != department:
+        if not can_access_department(actor, department):
             raise AdminConflict("You can only edit the admin chain for your department.")
         users_by_email = {
             user.email: user
@@ -163,6 +164,8 @@ def create_whole_day_leave(
     leave_date: date,
     reason: str,
 ) -> tuple[Leave, int]:
+    if leave_date < date.today() and faculty.role != "super_admin":
+        raise AdminConflict("Past leave requires a full administrator.")
     if leave_date.weekday() == 6:
         raise AdminConflict("Whole-day leave cannot be marked on Sunday.")
     normalized_reason = reason.strip()
@@ -219,7 +222,7 @@ def cancel_whole_day_leave(session: Session, faculty: User, leave_date: date) ->
     def cancel() -> None:
         leave = session.get(Leave, (faculty.id, leave_date))
         if leave is None:
-            raise AdminNotFound("Whole-day leave not found.")
+            return
         absence_ids = list(session.scalars(
             select(Absence.id).where(
                 Absence.faculty_id == faculty.id,

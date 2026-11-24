@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.security import create_access_token, decode_access_token
+from app.core.authorization import can_act_as_admin, can_edit_admin_chain, can_import_timetable
 from app.core.totp import decrypt_totp_secret, hash_backup_code, verify_totp
 from app.database import get_db
 from app.models import TotpBackupCode, User
@@ -116,6 +117,18 @@ def require_roles(*allowed_roles: str) -> Callable[..., User]:
     return role_guard
 
 
+def require_policy(policy: Callable[[User], bool]) -> Callable[..., User]:
+    def policy_guard(user: User = Depends(get_current_user)) -> User:
+        if not policy(user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action.",
+            )
+        return user
+
+    return policy_guard
+
+
 def require_acting_admin(permission: str) -> Callable[..., User]:
     if not permission:
         raise ValueError("An admin permission is required.")
@@ -135,15 +148,10 @@ def require_acting_admin(permission: str) -> Callable[..., User]:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=str(error),
             ) from error
-        if acting_user.id != user.id:
+        if not can_act_as_admin(user, acting_user.id, permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only the acting admin can perform this action.",
-            )
-        if user.role != "hod" and permission not in {"substitutions", "reports"}:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Stand-in admins may only manage substitutions and reports.",
+                detail="You are not authorized to perform this admin action.",
             )
         _require_admin_mfa(user, request, session)
         return user

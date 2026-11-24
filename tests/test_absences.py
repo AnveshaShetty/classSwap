@@ -58,7 +58,7 @@ def test_mark_absence_for_one_or_more_scheduled_periods(absence_context: tuple[T
     client, test_engine, faculty = absence_context
     response = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Medical leave"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Medical leave"},
     )
 
     assert response.status_code == 200
@@ -73,7 +73,7 @@ def test_absence_with_unscheduled_period_creates_no_rows(absence_context: tuple[
     client, test_engine, _ = absence_context
     response = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3, 7], "reason": "Personal work"},
+        json={"date": "2026-11-30", "periods": [3, 7], "reason": "Personal work"},
     )
 
     assert response.status_code == 422
@@ -81,11 +81,35 @@ def test_absence_with_unscheduled_period_creates_no_rows(absence_context: tuple[
         assert session.scalar(select(func.count()).select_from(Absence)) == 20
 
 
+def test_faculty_cannot_mark_past_absence(absence_context: tuple[TestClient, Engine, User]) -> None:
+    client, test_engine, faculty = absence_context
+    with Session(test_engine) as session:
+        existing_absences = session.scalar(
+            select(func.count()).select_from(Absence).where(Absence.faculty_id == faculty.id)
+        )
+
+    response = client.post(
+        "/absences",
+        json={
+            "date": (date.today() - timedelta(days=1)).isoformat(),
+            "periods": [3],
+            "reason": "Backdated absence",
+        },
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 422
+    with Session(test_engine) as session:
+        assert session.scalar(
+            select(func.count()).select_from(Absence).where(Absence.faculty_id == faculty.id)
+        ) == existing_absences
+
+
 def test_suggestions_exclude_teachers_busy_in_target_slot(absence_context: tuple[TestClient, Engine, User]) -> None:
     client, test_engine, _ = absence_context
     created = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Conference"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Conference"},
     )
     assert created.status_code == 200
 
@@ -99,13 +123,169 @@ def test_suggestions_exclude_teachers_busy_in_target_slot(absence_context: tuple
         absent_class = session.get(Timetable, absent.timetable_id)
         busy_ids = set(session.scalars(
             select(Timetable.faculty_id).where(
-                Timetable.day_of_week == date(2026, 11, 23).weekday(),
+                Timetable.day_of_week == date(2026, 11, 30).weekday(),
                 Timetable.period_no == 3,
             )
         ))
         assert absent_class is not None
         assert absent.faculty_id not in suggestion_ids
         assert not suggestion_ids.intersection(busy_ids)
+
+
+def test_absence_ids_are_hidden_from_another_faculty_member(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, owner = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-30", "periods": [3], "reason": "Private absence"},
+    )
+    absence_id = created.json()[0]["id"]
+
+    with Session(test_engine) as session:
+        other = session.scalar(
+            select(User).where(User.id != owner.id, User.role == "faculty").limit(1)
+        )
+        assert other is not None
+        other_user = _copy_user(session, other.id)
+    app.dependency_overrides[get_current_user] = lambda: other_user
+    headers = {"Accept": "application/json"}
+
+    assert client.get(
+        f"/absences/{absence_id}/suggestions",
+        headers=headers,
+    ).status_code == 404
+    assert client.get(
+        "/rooms/free",
+        params={"absence_id": absence_id},
+        headers=headers,
+    ).status_code == 404
+    assert client.get(
+        f"/absences/{absence_id}/suggestions/view",
+        headers=headers,
+    ).status_code == 404
+    assert client.get(
+        "/absences/999999/suggestions",
+        headers=headers,
+    ).status_code == 404
+
+
+def test_substitution_response_is_hidden_from_non_candidate(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, owner = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-30", "periods": [3], "reason": "Private absence"},
+    )
+    absence_id = created.json()[0]["id"]
+    candidate_id = client.get(f"/absences/{absence_id}/suggestions").json()[0]["faculty_id"]
+    request = client.post(
+        "/substitutions",
+        json={"absence_id": absence_id, "substitute_id": candidate_id},
+    )
+    assert request.status_code == 200
+
+    with Session(test_engine) as session:
+        other = session.scalar(
+            select(User).where(
+                User.id.not_in({owner.id, candidate_id}),
+                User.role == "faculty",
+            ).limit(1)
+        )
+        assert other is not None
+        other_user = _copy_user(session, other.id)
+    app.dependency_overrides[get_current_user] = lambda: other_user
+
+    hidden = client.patch(
+        f"/substitutions/{request.json()['id']}",
+        json={"status": "accepted"},
+        headers={"Accept": "application/json"},
+    )
+    unknown = client.patch(
+        "/substitutions/999999",
+        json={"status": "accepted"},
+        headers={"Accept": "application/json"},
+    )
+
+    assert hidden.status_code == unknown.status_code == 404
+
+
+def test_candidate_pending_request_limit_is_enforced(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, _ = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-30", "periods": [3], "reason": "Too many pending requests"},
+    )
+    assert created.status_code == 200
+    absence_id = created.json()[0]["id"]
+    candidate_id = client.get(f"/absences/{absence_id}/suggestions").json()[0]["faculty_id"]
+
+    with Session(test_engine) as session:
+        absence = session.get(Absence, absence_id)
+        assert absence is not None
+        timetable = session.get(Timetable, absence.timetable_id)
+        assert timetable is not None
+        other_absence_ids = list(
+            session.scalars(select(Absence.id).where(Absence.id != absence_id).limit(5))
+        )
+        assert len(other_absence_ids) == 5
+        session.add_all(
+            [
+                Substitution(
+                    absence_id=other_absence_ids[index - 1],
+                    substitute_id=candidate_id,
+                    room_id=timetable.room_id,
+                    date=date(2030, 1, index),
+                    period_no=1,
+                    status="pending",
+                )
+                for index in range(1, 6)
+            ]
+        )
+        session.commit()
+
+    response = client.post(
+        "/substitutions",
+        json={"absence_id": absence_id, "substitute_id": candidate_id},
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 409
+    assert "too many pending requests" in response.json()["detail"]
+
+
+def test_absence_create_rejects_mass_assignment(absence_context: tuple[TestClient, Engine, User]) -> None:
+    client, test_engine, _ = absence_context
+
+    response = client.post(
+        "/absences",
+        json={
+            "date": "2026-11-30",
+            "periods": [3],
+            "reason": "Unauthorized owner",
+            "faculty_id": 1,
+        },
+    )
+
+    assert response.status_code == 422
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Absence)) == 20
+
+
+def test_acting_admin_lookup_cannot_cross_departments(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, _, _ = absence_context
+
+    response = client.get(
+        "/admin/acting",
+        params={"department": "Unrelated Department"},
+    )
+
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize("status", ["pending", "accepted"])
@@ -116,7 +296,7 @@ def test_suggestions_exclude_active_substitutes_in_target_slot(
     client, test_engine, _ = absence_context
     created = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Medical leave"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Medical leave"},
     )
     assert created.status_code == 200
 
@@ -130,7 +310,7 @@ def test_suggestions_exclude_active_substitutes_in_target_slot(
         absence_class = session.get(Timetable, absence.timetable_id)
         assert absence_class is not None
         busy_faculty_ids = select(Timetable.faculty_id).where(
-            Timetable.day_of_week == date(2026, 11, 23).weekday(),
+            Timetable.day_of_week == date(2026, 11, 30).weekday(),
             Timetable.period_no == 3,
         )
         substitute = session.scalar(
@@ -178,7 +358,7 @@ def test_substitution_request_inbox_decline_offers_next_candidate(
     client, test_engine, _ = absence_context
     created = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Conference"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Conference"},
     )
     suggestions = client.get("/absences/%d/suggestions" % created.json()[0]["id"]).json()
     assert len(suggestions) >= 2
@@ -215,7 +395,7 @@ def test_substitution_request_can_be_accepted(
     client, test_engine, _ = absence_context
     created = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Training programme"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Training programme"},
     )
     selected_id = client.get(
         "/absences/%d/suggestions" % created.json()[0]["id"]
@@ -237,6 +417,13 @@ def test_substitution_request_can_be_accepted(
     assert accepted.status_code == 200
     assert accepted.json()["substitution"]["status"] == "accepted"
     assert accepted.json()["next_request"] is None
+    repeated = client.patch(
+        "/substitutions/%d" % request.json()["id"],
+        json={"status": "accepted"},
+    )
+    assert repeated.status_code == 200
+    assert repeated.json()["substitution"]["status"] == "accepted"
+    assert repeated.json()["next_request"] is None
 
 
 def test_hod_absence_automatically_requests_top_suggestion(
@@ -260,7 +447,7 @@ def test_hod_absence_automatically_requests_top_suggestion(
     created = client.post(
         "/absences",
         json={
-            "date": "2026-11-23",
+            "date": "2026-11-30",
             "periods": [period],
             "reason": "Medical leave",
         },
@@ -281,7 +468,7 @@ def test_same_substitute_cannot_be_requested_for_two_classes_in_one_slot(
     client, test_engine, _ = absence_context
     first_absence = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Medical leave"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Medical leave"},
     ).json()[0]
     suggestions = client.get(
         "/absences/%d/suggestions" % first_absence["id"]
@@ -309,7 +496,7 @@ def test_same_substitute_cannot_be_requested_for_two_classes_in_one_slot(
         second_absence = Absence(
             timetable_id=scheduled_class.id,
             faculty_id=scheduled_class.faculty_id,
-            date=date(2026, 11, 23),
+            date=date(2026, 11, 30),
             period_no=3,
             reason="Personal work",
         )
@@ -334,7 +521,7 @@ def test_free_room_lookup_respects_class_type_and_section_capacity(
     client, test_engine, _ = absence_context
     created = client.post(
         "/absences",
-        json={"date": "2026-11-23", "periods": [3], "reason": "Training programme"},
+        json={"date": "2026-11-30", "periods": [3], "reason": "Training programme"},
     ).json()[0]
 
     rooms = client.get("/rooms/free", params={"absence_id": created["id"]})
@@ -393,8 +580,10 @@ def test_cancelling_whole_day_leave_removes_its_absences(
     assert created.status_code == 200
 
     deleted = client.delete("/leaves/%s" % leave_date.isoformat())
+    repeated = client.delete("/leaves/%s" % leave_date.isoformat())
 
     assert deleted.status_code == 204
+    assert repeated.status_code == 204
     with Session(test_engine) as session:
         assert session.get(Leave, (faculty.id, leave_date)) is None
         assert session.scalar(
@@ -453,7 +642,7 @@ def test_stand_in_admin_cannot_import_timetable(
     assert response.status_code == 403
 
 
-def test_acting_hod_can_edit_chain_and_the_change_is_audited(
+def test_acting_hod_cannot_edit_admin_chain(
     absence_context: tuple[TestClient, Engine, User],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -484,10 +673,10 @@ def test_acting_hod_can_edit_chain_and_the_change_is_audited(
         json={"department": "Computer Science and Design", "entries": chain},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 403
     with Session(test_engine) as session:
         assert session.scalar(
             select(func.count()).select_from(AuditLog).where(
                 AuditLog.action == "admin_chain.updated"
             )
-        ) == 1
+        ) == 0

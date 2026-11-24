@@ -113,11 +113,54 @@ codes can be used once. Production now also requires SMTP, HTTPS
 Still open in this phase: no implementation items remain. MFA recovery/key
 rotation and operational delivery limits remain deployment concerns.
 
+## Phase 2: authorization and object access
+
+**Status: partial.** Added pure policies in `app/core/authorization.py` for
+absence ownership, department scope, candidate response ownership, acting
+administrator permissions, timetable import, and admin-chain changes.
+Absence suggestions, free-room lookup, and the suggestions page now return
+not-found responses for records outside the caller's scope. Substitution
+responses are restricted to the addressed candidate. Acting-admin permission
+checks use an allowlist; stand-ins cannot import timetables or edit the admin
+chain. The route-policy regression test requires every API route to either
+include the authenticated-user dependency or an explicit public marker.
+Input models touched in this phase reject unknown fields and substitution
+identifiers must be positive strict integers. Repeated accept/decline and leave
+cancellation requests no longer repeat state changes.
+
+Behavior changes: timetable imports and admin-chain edits are now limited to
+super administrators (HODs and acting stand-ins receive 403); repeating an
+already completed substitution response with the same status returns the
+existing result; repeating a leave cancellation returns 204 without changing
+data. Non-super-admin users can no longer backdate absences or whole-day leave,
+and candidates with five pending substitution requests are excluded from
+additional assignments.
+
+Regression evidence: `test_every_route_declares_authentication_or_public_policy`,
+`test_acting_admin_permissions_are_allowlisted`,
+`test_absence_ids_are_hidden_from_another_faculty_member`,
+`test_substitution_response_is_hidden_from_non_candidate`,
+`test_absence_create_rejects_mass_assignment`,
+`test_faculty_cannot_mark_past_absence`,
+`test_candidate_pending_request_limit_is_enforced`,
+`test_stand_in_admin_cannot_import_timetable`,
+`test_acting_hod_cannot_edit_admin_chain`,
+`test_substitution_request_can_be_accepted`, and
+`test_cancelling_whole_day_leave_removes_its_absences`.
+
+Remaining Phase 2 work: complete the role/endpoint/object authorization
+matrix; verify transactional behavior for concurrent requests against
+PostgreSQL; add an authoritative holiday calendar; and validate race behavior
+under database-level concurrency. Absences are naturally bounded to the seven
+periods in a day, incoming pending substitutions are capped at five per
+candidate, and faculty cannot submit past absences or leave. These remaining
+items are not claimed as complete.
+
 ### OWASP Top 10 (2021) initial mapping
 
 | Category | Phase 0 status | Evidence / next step |
 |---|---|---|
-| A01 Broken Access Control | Findings | Findings 3–4; centralize policy and add ownership/role regression tests. |
+| A01 Broken Access Control | Partial | Phase 2 policies and ownership tests; complete the route/object matrix and race/abuse limits. |
 | A02 Cryptographic Failures | Finding | Finding 1; remove signing-key fallback and validate production configuration. |
 | A03 Injection | Not assessed exhaustively | Run targeted query review and add input/injection regression tests. |
 | A04 Insecure Design | Partial | Abuse cases above; review action-link, state-transition, and concurrency design. |

@@ -6,7 +6,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_acting_admin
+from app.core.authorization import can_import_timetable
+from app.core.dependencies import get_current_user, require_policy
 from app.database import get_db
 from app.models import User
 from app.services.admin import AdminNotFound, get_acting_admin
@@ -63,7 +64,7 @@ def read_timetable(
 @router.post("/timetable/import")
 async def import_timetable(
     file: UploadFile = File(...),
-    actor: User = Depends(require_acting_admin("timetable")),
+    actor: User = Depends(require_policy(can_import_timetable)),
     session: Session = Depends(get_db),
 ) -> dict[str, int]:
     content = await file.read()

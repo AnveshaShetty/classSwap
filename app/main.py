@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.routing import APIRoute
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,8 +28,17 @@ app.include_router(absence_router)
 app.include_router(admin_router)
 app.include_router(substitution_router)
 
+for route in app.routes:
+    if isinstance(route, APIRoute) and route.path in {
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/docs/oauth2-redirect",
+    }:
+        route.openapi_extra = {"x-auth-policy": "public"}
 
-@app.get("/health")
+
+@app.get("/health", openapi_extra={"x-auth-policy": "public"})
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 

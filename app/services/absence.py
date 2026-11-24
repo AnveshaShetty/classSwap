@@ -89,6 +89,8 @@ def mark_absence(
 ) -> list[Absence]:
     if not faculty.teaches:
         raise AbsenceSelectionError("This account is not eligible to mark teaching absences.")
+    if absence_date < date.today() and faculty.role != "super_admin":
+        raise AbsenceSelectionError("Past absences require a full administrator.")
     if session.in_transaction():
         with session.begin_nested():
             absences = _create_absences(session, faculty.id, absence_date, periods, reason)

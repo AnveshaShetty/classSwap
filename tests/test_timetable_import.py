@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from app.config import settings
 from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
 from app.main import app
-from app.models import Room, Section, Timetable, User
+from app.models import Leave, Room, Section, Timetable, User
 from scripts.seed import load_seed
 
 
@@ -40,24 +41,24 @@ def timetable_context(
     secret = pyotp.random_base32()
     monkeypatch.setattr(settings, "totp_encryption_key", Fernet.generate_key().decode("ascii"))
     with Session(test_engine) as session:
-        hod_row = session.scalar(select(User).where(User.email == "meera.shenoy@demo.edu"))
-        assert hod_row is not None
-        hod_row.totp_secret_encrypted = encrypt_totp_secret(secret)
-        hod_row.totp_enabled = True
-        hod = User(
-            id=hod_row.id,
-            name=hod_row.name,
-            email=hod_row.email,
-            password_hash=hod_row.password_hash,
-            role=hod_row.role,
-            department=hod_row.department,
-            teaches=hod_row.teaches,
-            totp_secret_encrypted=hod_row.totp_secret_encrypted,
+        admin_row = session.scalar(select(User).where(User.role == "super_admin"))
+        assert admin_row is not None
+        admin_row.totp_secret_encrypted = encrypt_totp_secret(secret)
+        admin_row.totp_enabled = True
+        admin = User(
+            id=admin_row.id,
+            name=admin_row.name,
+            email=admin_row.email,
+            password_hash=admin_row.password_hash,
+            role=admin_row.role,
+            department=admin_row.department,
+            teaches=admin_row.teaches,
+            totp_secret_encrypted=admin_row.totp_secret_encrypted,
             totp_enabled=True,
         )
         session.commit()
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_current_user] = lambda: hod
+    app.dependency_overrides[get_current_user] = lambda: admin
     with TestClient(app, base_url="https://testserver") as client:
         client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
         yield client, test_engine
@@ -91,7 +92,7 @@ def test_valid_csv_import_preserves_absence_history(timetable_context: tuple[Tes
     app.dependency_overrides.pop(get_current_user)
     login_response = client.post(
         "/auth/login",
-        json={"email": "meera.shenoy@demo.edu", "password": "demo123"},
+        json={"email": "principal.demo@demo.edu", "password": "demo123"},
     )
     assert login_response.status_code == 200
 
@@ -155,6 +156,36 @@ def test_faculty_cannot_import_timetable(timetable_context: tuple[TestClient, En
         department="Computer Science and Design",
         teaches=True,
     )
+    csv_path = Path(__file__).resolve().parents[1] / "seed" / "timetable.csv"
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("timetable.csv", csv_path.read_bytes(), "text/csv")},
+    )
+
+    assert response.status_code == 403
+
+
+def test_stand_in_admin_cannot_import_timetable(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.email == "meera.shenoy@demo.edu"))
+        stand_in = session.scalar(select(User).where(User.email == "arjun.kulkarni@demo.edu"))
+        assert hod is not None and stand_in is not None
+        session.add(Leave(user_id=hod.id, date=date.today()))
+        acting_user = User(
+            id=stand_in.id,
+            name=stand_in.name,
+            email=stand_in.email,
+            password_hash=stand_in.password_hash,
+            role=stand_in.role,
+            department=stand_in.department,
+            teaches=stand_in.teaches,
+        )
+        session.commit()
+    app.dependency_overrides[get_current_user] = lambda: acting_user
     csv_path = Path(__file__).resolve().parents[1] / "seed" / "timetable.csv"
 
     response = client.post(

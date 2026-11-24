@@ -2,10 +2,11 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.authorization import can_respond_to_substitution
 from app.models import Absence, AuditLog, Room, Section, Subject, Substitution, Timetable, User
 from app.services.suggestion import Suggestion, suggest_candidates
 
@@ -20,6 +21,9 @@ class SubstitutionForbidden(PermissionError):
 
 class SubstitutionConflict(ValueError):
     pass
+
+
+MAX_PENDING_REQUESTS_PER_USER = 5
 
 
 Result = TypeVar("Result")
@@ -41,9 +45,20 @@ def _check_candidate_slot(
     candidate_id: int,
     current_substitution_id: int | None = None,
 ) -> None:
-    candidate = session.get(User, candidate_id)
+    candidate = session.scalar(
+        select(User).where(User.id == candidate_id).with_for_update()
+    )
     if candidate is None or not candidate.teaches or candidate_id == absence.faculty_id:
         raise SubstitutionConflict("This faculty member cannot cover the absence.")
+
+    pending_count = session.scalar(
+        select(func.count(Substitution.id)).where(
+            Substitution.substitute_id == candidate_id,
+            Substitution.status == "pending",
+        )
+    )
+    if pending_count is not None and pending_count >= MAX_PENDING_REQUESTS_PER_USER:
+        raise SubstitutionConflict("This faculty member already has too many pending requests.")
 
     day_number = absence.date.weekday()
     has_class = session.scalar(
@@ -82,7 +97,7 @@ def _create_request(
 ) -> Substitution:
     absence = _get_absence(session, absence_id, lock=True)
     if enforce_owner and absence.faculty_id != requester_id:
-        raise SubstitutionForbidden("Only the absent faculty member can request a substitute.")
+        raise SubstitutionNotFound("Absence not found.")
     already_covered = session.scalar(
         select(Substitution.id).where(
             Substitution.absence_id == absence_id,
@@ -191,9 +206,22 @@ def _transition(
     )
     if substitution is None:
         raise SubstitutionNotFound("Substitution request not found.")
-    if substitution.substitute_id != actor_id:
-        raise SubstitutionForbidden("Only the assigned substitute can respond to this request.")
+    if not can_respond_to_substitution(actor_id, substitution):
+        raise SubstitutionNotFound("Substitution request not found.")
     if substitution.status != "pending":
+        if substitution.status == target_status:
+            next_request = None
+            if target_status == "declined":
+                next_request = session.scalar(
+                    select(Substitution)
+                    .where(
+                        Substitution.absence_id == substitution.absence_id,
+                        Substitution.status == "pending",
+                    )
+                    .order_by(Substitution.id)
+                    .limit(1)
+                )
+            return substitution, next_request
         raise SubstitutionConflict("This request is no longer pending.")
 
     absence = _get_absence(session, substitution.absence_id, lock=True)
