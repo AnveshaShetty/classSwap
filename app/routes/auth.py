@@ -1,10 +1,14 @@
+import logging
 import secrets
 
 from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.audit import append_audit
 from app.core.csrf import require_csrf
 from app.core.dependencies import get_current_user, require_roles
 from app.core.security import create_access_token, hash_password, verify_password
@@ -17,7 +21,18 @@ from app.core.totp import (
     verify_totp,
 )
 from app.database import get_db
-from app.models import TotpBackupCode, User
+from app.models import (
+    Absence,
+    AuditLog,
+    Leave,
+    Room,
+    Section,
+    Subject,
+    Substitution,
+    Timetable,
+    TotpBackupCode,
+    User,
+)
 from app.schemas.auth import (
     LoginRequest,
     PasswordChangeRequest,
@@ -36,6 +51,7 @@ from app.services.email import dispatch_password_reset_email
 
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
+security_logger = logging.getLogger("app.security")
 
 
 @router.post(
@@ -81,6 +97,7 @@ def logout(
     session: Session = Depends(get_db),
 ) -> None:
     current_user.token_version += 1
+    append_audit(session, current_user, "auth.logout", "user:%d" % current_user.id)
     session.commit()
     response.delete_cookie(settings.auth_cookie_name, path="/")
 
@@ -104,6 +121,7 @@ def change_password(
     current_user.password_hash = hash_password(payload.new_password)
     current_user.must_change_password = False
     current_user.token_version += 1
+    append_audit(session, current_user, "auth.password_changed", "user:%d" % current_user.id)
     session.commit()
     response.delete_cookie(settings.auth_cookie_name, path="/")
 
@@ -210,3 +228,93 @@ def read_current_user(
     user: User = Depends(get_current_user),
 ) -> User:
     return user
+
+
+@router.get("/me/export")
+def export_current_user_data(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> JSONResponse:
+    security_logger.info(
+        "User data export requested",
+        extra={"user_id": user.id, "action": "user.data_exported"},
+    )
+    timetable_rows = session.execute(
+        select(Timetable, Section.name, Subject.name, Room.name)
+        .join(Section, Section.id == Timetable.section_id)
+        .join(Subject, Subject.id == Timetable.subject_id)
+        .join(Room, Room.id == Timetable.room_id)
+        .where(Timetable.faculty_id == user.id)
+        .order_by(Timetable.day_of_week, Timetable.period_no)
+    )
+    absences = session.scalars(
+        select(Absence).where(Absence.faculty_id == user.id).order_by(Absence.date, Absence.period_no)
+    )
+    substitutions = session.execute(
+        select(Substitution, Absence.faculty_id)
+        .join(Absence, Absence.id == Substitution.absence_id)
+        .where(or_(Substitution.substitute_id == user.id, Absence.faculty_id == user.id))
+        .order_by(Substitution.date, Substitution.period_no, Substitution.id)
+    )
+    leaves = session.scalars(
+        select(Leave).where(Leave.user_id == user.id).order_by(Leave.date)
+    )
+    audit_entries = session.scalars(
+        select(AuditLog).where(AuditLog.user_id == user.id).order_by(AuditLog.id)
+    )
+    data = {
+        "schema_version": 1,
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "department": user.department,
+            "role": user.role,
+            "teaches": user.teaches,
+        },
+        "timetable": [
+            {
+                "id": row.id,
+                "day_of_week": row.day_of_week,
+                "period": row.period_no,
+                "section": section_name,
+                "subject": subject_name,
+                "room": room_name,
+            }
+            for row, section_name, subject_name, room_name in timetable_rows
+        ],
+        "absences": [
+            {
+                "id": absence.id,
+                "date": absence.date.isoformat(),
+                "period": absence.period_no,
+                "reason": absence.reason,
+            }
+            for absence in absences
+        ],
+        "substitutions": [
+            {
+                "id": substitution.id,
+                "date": substitution.date.isoformat(),
+                "period": substitution.period_no,
+                "status": substitution.status,
+                "related_to_own_absence": faculty_id == user.id,
+            }
+            for substitution, faculty_id in substitutions
+        ],
+        "leaves": [{"date": leave.date.isoformat()} for leave in leaves],
+        "audit_events": [
+            {
+                "id": entry.id,
+                "action": entry.action,
+                "target": entry.target,
+                "created_at": entry.created_at.isoformat(),
+                "entry_hash": entry.entry_hash,
+            }
+            for entry in audit_entries
+        ],
+    }
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": 'attachment; filename="classswap-user-data.json"'},
+    )

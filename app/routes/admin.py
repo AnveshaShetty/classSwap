@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.audit import append_audit
 from app.core.authorization import can_access_department, can_edit_admin_chain
 from app.core.csrf import require_csrf
 from app.core.dependencies import (
@@ -25,6 +26,7 @@ from app.schemas.admin import (
 from app.services.admin import (
     AdminConflict,
     AdminNotFound,
+    anonymize_user,
     cancel_whole_day_leave,
     create_whole_day_leave,
     get_acting_admin,
@@ -69,7 +71,23 @@ def force_logout_user(
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     target.token_version += 1
+    append_audit(session, actor, "user.force_logout", "user:%d" % target.id)
     session.commit()
+
+
+@router.post("/admin/users/{user_id}/anonymize", status_code=status.HTTP_204_NO_CONTENT)
+def anonymize_user_data(
+    user_id: int,
+    actor: User = Depends(require_roles("super_admin")),
+    _: User = Depends(require_admin_mfa),
+    session: Session = Depends(get_db),
+) -> None:
+    try:
+        anonymize_user(session, actor, user_id)
+    except AdminNotFound as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.") from error
+    except AdminConflict as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
 
 
 @router.get("/admin/chain", response_model=AdminChainRead)

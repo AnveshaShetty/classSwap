@@ -7,9 +7,9 @@ import pandas as pd
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.audit import append_audit
 from app.models import (
     Absence,
-    AuditLog,
     FacultySubject,
     Room,
     Section,
@@ -239,13 +239,7 @@ def _import_in_transaction(session: Session, content: bytes, actor: User | None 
         ))
     session.flush()
     if actor is not None:
-        session.add(AuditLog(
-            user_id=actor.id,
-            acting_as=actor.role,
-            action="timetable.imported",
-            target="%d timetable row(s)" % len(rows),
-        ))
-        session.flush()
+        append_audit(session, actor, "timetable.imported", "%d timetable row(s)" % len(rows))
     return len(rows)
 
 

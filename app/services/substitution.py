@@ -6,8 +6,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.audit import append_audit
 from app.core.authorization import can_respond_to_substitution
-from app.models import Absence, AuditLog, Room, Section, Subject, Substitution, Timetable, User
+from app.models import Absence, Room, Section, Subject, Substitution, Timetable, User
 from app.services.suggestion import Suggestion, suggest_candidates
 
 
@@ -165,13 +166,15 @@ def auto_request_for_hod_absence(session: Session, absence: Absence) -> Substitu
             absence.faculty_id,
             enforce_owner=False,
         )
-        session.add(AuditLog(
-            user_id=absence.faculty_id,
-            acting_as="hod",
-            action="substitution.auto_requested",
-            target="absence:%d substitute:%d" % (absence.id, request.substitute_id),
-        ))
-        session.flush()
+        actor = session.get(User, absence.faculty_id)
+        if actor is not None:
+            append_audit(
+                session,
+                actor,
+                "substitution.auto_requested",
+                "absence:%d substitute:%d" % (absence.id, request.substitute_id),
+                acting_as="hod",
+            )
         return request
 
     return _run_transaction(session, create_auto_request)
@@ -230,6 +233,14 @@ def _transition(
     substitution.status = target_status
     substitution.responded_at = datetime.now(timezone.utc)
     session.flush()
+    actor = session.get(User, actor_id)
+    if actor is not None:
+        append_audit(
+            session,
+            actor,
+            "substitution.%s" % target_status,
+            "substitution:%d" % substitution.id,
+        )
     next_request = _offer_next_candidate(session, absence) if target_status == "declined" else None
     return substitution, next_request
 

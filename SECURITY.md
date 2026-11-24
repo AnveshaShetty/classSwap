@@ -255,6 +255,67 @@ the deployment-specific allowed-host/CORS configuration; and consider
 self-hosting the integrity-pinned frontend assets to remove the CDN dependency.
 Do not treat these code-level tests as proof of deployment transport security.
 
+## Phase 6: data protection, database, logging, and audit
+
+**Status: partial.** Audit events are now appended through a single helper,
+serialized with a PostgreSQL transaction advisory lock, and chained with
+SHA-256 over the previous hash and canonical event fields. The migration
+backfills existing entries, adds non-null hash fields, and installs a
+PostgreSQL trigger that rejects UPDATE and DELETE. ORM-level mutation is also
+blocked, and `python scripts/verify_audit.py` checks the complete chain.
+Authentication successes/failures, password changes/resets, logout, force
+logout, anonymization, data export, timetable import, admin-chain/leave
+changes, and substitution responses are audited or logged. Request IDs are
+generated server-side, returned as `X-Request-ID`, and included in structured
+JSON logs. The logging filter redacts email addresses and common secret
+assignments; authentication logs use hashed account/IP identifiers and never
+include passwords.
+
+Users can download their own profile, timetable, absences, substitutions,
+leave records, and audit events at `GET /me/export`. A super administrator
+with MFA can anonymize another account; account credentials, TOTP secrets,
+reset tokens, role membership, and allocation data are cleared or invalidated
+while operational references and immutable audit history remain. TOTP secrets
+continue to use Fernet encryption from `TOTP_ENCRYPTION_KEY`; backup codes
+remain hashed. No Telegram chat identifier exists in this checkout.
+
+Behavior changes: production container startup no longer runs Alembic as the
+application database user; development retains automatic migrations. Run
+production migrations as a one-shot operation using a separate DDL-capable
+`MIGRATION_DATABASE_URL`; keep the app's `DATABASE_URL` on a least-privilege
+non-owner role with no schema DDL grants. Audit targets now use user IDs
+rather than emails. Historical audit target text is retained to preserve
+chain integrity, so legacy entries may still contain personal data;
+anonymization does not rewrite the append-only chain.
+
+Regression evidence: `test_audit_entries_form_a_verifiable_hash_chain`,
+`test_audit_entries_cannot_be_updated_or_deleted_through_orm`,
+`test_anonymizing_user_preserves_audit_chain_and_invalidates_sessions`,
+`test_user_data_export_contains_only_safe_account_fields`,
+`test_failed_login_logs_never_include_password`,
+`test_redaction_filter_removes_email_and_password_values`, and
+`test_responses_include_a_server_generated_request_id`.
+
+Operational requirements: take encrypted, access-controlled PostgreSQL
+backups with `pg_dump --format=custom --no-owner --file=classswap.dump
+"$DATABASE_URL"`; restore into an isolated database with
+`pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL"
+classswap.dump`, then run `python scripts/verify_audit.py` and application
+smoke tests before promotion.
+Exercise restores regularly and retain backups outside the primary failure
+domain. Back up `TOTP_ENCRYPTION_KEY` in a separate secrets vault. Rotation
+requires a controlled job that decrypts each stored TOTP secret with the old
+key, re-encrypts it with the new key, verifies all records, and only then
+replaces the runtime key; retain a protected rollback copy until completion.
+
+Remaining Phase 6 work: provision and test separate PostgreSQL owner,
+migration, and runtime roles with actual grants; validate append-only behavior
+and advisory-lock ordering against PostgreSQL; implement a managed key
+rotation process; and decide retention/legal-deletion requirements for
+personal data retained inside historical audit records. Database encryption
+at rest, field-level encryption beyond TOTP, and production backup/restore
+testing remain deployment responsibilities.
+
 ### OWASP Top 10 (2021) initial mapping
 
 | Category | Phase 0 status | Evidence / next step |

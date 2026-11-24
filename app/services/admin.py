@@ -1,22 +1,28 @@
 import re
 from collections.abc import Callable
 from datetime import date
+import secrets
 from typing import TypeVar
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.authorization import can_access_department
+from app.core.audit import append_audit
 from app.models import (
     Absence,
     AdminChain,
-    AuditLog,
+    FacultyAllocation,
+    FacultySubject,
     Leave,
+    PasswordResetToken,
     Substitution,
     Timetable,
+    TotpBackupCode,
     User,
 )
+from app.core.security import hash_password
 from app.services.substitution import auto_request_for_hod_absence
 
 
@@ -89,12 +95,7 @@ def _run_transaction(session: Session, action: Callable[[], Result]) -> Result:
 
 
 def _audit(session: Session, actor: User, action: str, target: str) -> None:
-    session.add(AuditLog(
-        user_id=actor.id,
-        acting_as=actor.role,
-        action=action,
-        target=target,
-    ))
+    append_audit(session, actor, action, target)
 
 
 def read_admin_chain(session: Session, department: str) -> list[tuple[AdminChain, User]]:
@@ -202,7 +203,7 @@ def create_whole_day_leave(
                 period_no=scheduled_class.period_no,
                 reason=normalized_reason,
             ))
-        _audit(session, faculty, "leave.created", "%s on %s" % (faculty.email, leave_date))
+        _audit(session, faculty, "leave.created", "user:%d on %s" % (faculty.id, leave_date))
         session.flush()
         return leave, len(scheduled)
 
@@ -235,7 +236,44 @@ def cancel_whole_day_leave(session: Session, faculty: User, leave_date: date) ->
             )
             session.execute(delete(Absence).where(Absence.id.in_(absence_ids)))
         session.delete(leave)
-        _audit(session, faculty, "leave.cancelled", "%s on %s" % (faculty.email, leave_date))
+        _audit(session, faculty, "leave.cancelled", "user:%d on %s" % (faculty.id, leave_date))
         session.flush()
 
     _run_transaction(session, cancel)
+
+
+def anonymize_user(session: Session, actor: User, user_id: int) -> User:
+    def anonymize() -> User:
+        target = session.scalar(select(User).where(User.id == user_id).with_for_update())
+        if target is None:
+            raise AdminNotFound("User not found.")
+        if target.id == actor.id:
+            raise AdminConflict("You cannot anonymize your own account.")
+        if target.role == "super_admin":
+            administrator_count = session.scalar(
+                select(func.count()).select_from(User).where(User.role == "super_admin")
+            ) or 0
+            if administrator_count <= 1:
+                raise AdminConflict("The last super administrator cannot be anonymized.")
+
+        session.execute(delete(AdminChain).where(AdminChain.user_id == target.id))
+        session.execute(delete(FacultyAllocation).where(FacultyAllocation.faculty_id == target.id))
+        session.execute(delete(FacultySubject).where(FacultySubject.faculty_id == target.id))
+        session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == target.id))
+        session.execute(delete(TotpBackupCode).where(TotpBackupCode.user_id == target.id))
+        target.name = "Deleted user %d" % target.id
+        target.email = "anonymized-%d-%s@invalid.example" % (target.id, secrets.token_hex(8))
+        target.department = "Deleted"
+        target.password_hash = hash_password(secrets.token_urlsafe(32))
+        target.role = "faculty"
+        target.teaches = False
+        target.must_change_password = True
+        target.token_version += 1
+        target.totp_secret_encrypted = None
+        target.totp_pending_secret_encrypted = None
+        target.totp_enabled = False
+        append_audit(session, actor, "user.anonymized", "user:%d" % target.id)
+        session.flush()
+        return target
+
+    return _run_transaction(session, anonymize)

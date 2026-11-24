@@ -1,6 +1,7 @@
 from collections.abc import Callable
 import hmac
 from datetime import date, datetime, timedelta, timezone
+import logging
 
 from cryptography.fernet import InvalidToken
 from fastapi import Depends, HTTPException, Request, Response, status
@@ -16,10 +17,17 @@ from app.models import TotpBackupCode, User
 from app.services.admin import AdminNotFound, get_acting_admin
 
 
+security_logger = logging.getLogger("app.security")
+
+
 def _require_admin_mfa(user: User, request: Request, session: Session) -> None:
     if user.role not in {"hod", "super_admin"}:
         return
     if not user.totp_enabled or not user.totp_secret_encrypted:
+        security_logger.warning(
+            "Admin MFA denied",
+            extra={"user_id": user.id, "action": "mfa.not_enabled"},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Set up two-factor authentication before using admin features.",
@@ -46,6 +54,10 @@ def _require_admin_mfa(user: User, request: Request, session: Session) -> None:
         session.delete(backup)
         session.commit()
         return
+    security_logger.warning(
+        "Admin MFA denied",
+        extra={"user_id": user.id, "action": "mfa.invalid_code"},
+    )
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="A valid two-factor code is required.",
@@ -108,6 +120,10 @@ def require_roles(*allowed_roles: str) -> Callable[..., User]:
 
     def role_guard(user: User = Depends(get_current_user)) -> User:
         if user.role not in allowed_roles:
+            security_logger.warning(
+                "Authorization denied",
+                extra={"user_id": user.id, "action": "authorization.role_denied"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",
@@ -120,6 +136,10 @@ def require_roles(*allowed_roles: str) -> Callable[..., User]:
 def require_policy(policy: Callable[[User], bool]) -> Callable[..., User]:
     def policy_guard(user: User = Depends(get_current_user)) -> User:
         if not policy(user):
+            security_logger.warning(
+                "Authorization denied",
+                extra={"user_id": user.id, "action": "authorization.policy_denied"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",
@@ -149,6 +169,10 @@ def require_acting_admin(permission: str) -> Callable[..., User]:
                 detail=str(error),
             ) from error
         if not can_act_as_admin(user, acting_user.id, permission):
+            security_logger.warning(
+                "Authorization denied",
+                extra={"user_id": user.id, "action": "authorization.acting_admin_denied"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not authorized to perform this admin action.",

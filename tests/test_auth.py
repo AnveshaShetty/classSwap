@@ -1,5 +1,7 @@
+import csv
 from datetime import datetime, timezone
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 import jwt
@@ -67,6 +69,36 @@ def test_login_sets_http_only_cookie_and_me_returns_user(auth_client: TestClient
     assert auth_client.get("/me").json()["role"] == "faculty"
 
 
+def test_user_data_export_contains_only_safe_account_fields(auth_client: TestClient) -> None:
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    login_response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+    assert login_response.status_code == 200
+
+    response = auth_client.get("/me/export")
+    data = response.json()
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"].endswith("classswap-user-data.json\"")
+    assert data["user"]["email"] == "ravi.kulal@demo.edu"
+    assert "password_hash" not in response.text
+    assert "token_version" not in response.text
+    assert "totp_secret_encrypted" not in response.text
+    with (Path(__file__).parents[1] / "seed" / "faculty.csv").open(
+        "r",
+        newline="",
+        encoding="utf-8",
+    ) as faculty_csv:
+        other_emails = [
+            row["email"]
+            for row in csv.DictReader(faculty_csv)
+            if row["email"].lower() != "ravi.kulal@demo.edu"
+        ]
+    assert all(email not in response.text for email in other_emails)
+
+
 def test_invalid_credentials_and_missing_cookie_are_rejected(auth_client: TestClient) -> None:
     auth_client.cookies.delete(settings.auth_cookie_name)
     invalid_login = auth_client.post(
@@ -77,6 +109,18 @@ def test_invalid_credentials_and_missing_cookie_are_rejected(auth_client: TestCl
 
     assert invalid_login.status_code == 401
     assert unauthenticated.status_code == 401
+
+
+def test_failed_login_logs_never_include_password(auth_client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    secret = "must-never-appear-in-logs"
+
+    response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": secret},
+    )
+
+    assert response.status_code == 401
+    assert secret not in caplog.text
 
 
 def test_oversized_json_request_is_rejected(auth_client: TestClient) -> None:

@@ -1,7 +1,9 @@
 from logging.config import fileConfig
+import os
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from dotenv import dotenv_values
 
 from app.config import settings
 from app.database import Base
@@ -9,7 +11,12 @@ import app.models  # noqa: F401
 
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+migration_database_url = (
+    os.getenv("MIGRATION_DATABASE_URL")
+    or dotenv_values(".env").get("MIGRATION_DATABASE_URL")
+    or settings.database_url
+)
+config.set_main_option("sqlalchemy.url", migration_database_url.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -18,7 +25,7 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=settings.database_url,
+        url=migration_database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

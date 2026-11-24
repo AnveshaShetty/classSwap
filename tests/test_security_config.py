@@ -105,6 +105,8 @@ def test_production_settings_require_hardened_transport_and_database() -> None:
         _production_settings(DATABASE_URL="sqlite:///unsafe.db")
     with pytest.raises(ValueError, match="DEBUG=false"):
         _production_settings(DEBUG=True)
+    with pytest.raises(ValueError, match="LOG_LEVEL"):
+        _production_settings(LOG_LEVEL="DEBUG")
     with pytest.raises(ValueError, match="wildcard"):
         Settings(
             _env_file=None,

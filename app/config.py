@@ -20,6 +20,7 @@ class Settings(BaseSettings):
         default="development",
         validation_alias="ENV",
     )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     debug: bool = False
     database_url: str = "postgresql+psycopg://classswap:classswap@localhost:5432/classswap"
     jwt_secret_key: str = ""
@@ -70,6 +71,8 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("CORS_ALLOWED_ORIGINS must contain only explicit origins.")
         if self.environment == "production":
+            if self.log_level == "DEBUG":
+                raise ValueError("Production requires LOG_LEVEL to be INFO or higher.")
             secret = self.jwt_secret_key
             placeholders = (
                 "replace-this",

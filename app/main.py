@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.core.body_limits import RequestBodyLimitMiddleware
 from app.core.csrf import CSRF_COOKIE_NAME
+from app.core.observability import configure_logging, request_id_context
 from app.core.rate_limit import rate_limit_response
 from app.core.templating import templates
 from app.routes.absence import router as absence_router
@@ -24,6 +25,9 @@ from app.routes.dashboard import router as dashboard_router
 from app.routes.pages import router as pages_router
 from app.routes.timetable import router as timetable_router
 from app.routes.substitution import router as substitution_router
+
+configure_logging(settings.log_level)
+
 
 def api_docs_urls(environment: str) -> dict[str, str | None]:
     if environment == "production":
@@ -76,6 +80,19 @@ for route in app.routes:
         "/docs/oauth2-redirect",
     }:
         route.openapi_extra = {"x-auth-policy": "public"}
+
+
+@app.middleware("http")
+async def attach_request_id(request: Request, call_next):
+    request_id = secrets.token_hex(16)
+    request.state.request_id = request_id
+    context_token = request_id_context.set(request_id)
+    try:
+        response = await call_next(request)
+    finally:
+        request_id_context.reset(context_token)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 @app.middleware("http")

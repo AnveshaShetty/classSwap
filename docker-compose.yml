@@ -20,6 +20,7 @@ services:
     environment:
       ENV: ${ENV:-development}
       DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-classswap}:${POSTGRES_PASSWORD:-classswap}@db:5432/${POSTGRES_DB:-classswap}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}

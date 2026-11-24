@@ -1,0 +1,19 @@
+import sys
+
+from app.core.audit import AuditChainError, verify_audit_chain
+from app.database import SessionLocal
+
+
+def main() -> int:
+    with SessionLocal() as session:
+        try:
+            verify_audit_chain(session)
+        except AuditChainError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+    print("Audit chain verified.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

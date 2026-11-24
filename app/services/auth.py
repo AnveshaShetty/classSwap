@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.audit import append_audit
 from app.core.security import (
     dummy_password_hash,
     hash_password,
@@ -173,6 +174,7 @@ def consume_password_reset_token(
         .with_for_update()
     ):
         previous.used_at = now
+    append_audit(session, user, "auth.password_reset", "user:%d" % user.id)
     session.commit()
     return True
 
@@ -200,6 +202,9 @@ def authenticate_user(
         user.password_hash if user is not None else dummy_password_hash,
     )
     if is_locked:
+        if user is not None:
+            append_audit(session, user, "auth.login_locked", "user:%d" % user.id)
+            session.commit()
         logger.warning(
             "Authentication temporarily locked",
             extra={"account_hash": keys[0][1], "ip_hash": keys[1][1]},
@@ -207,6 +212,8 @@ def authenticate_user(
         return None
     if user is None or not password_valid:
         _record_failure(session, keys, now)
+        if user is not None:
+            append_audit(session, user, "auth.login_failed", "user:%d" % user.id)
         session.commit()
         logger.warning(
             "Authentication failed",
@@ -216,5 +223,6 @@ def authenticate_user(
     _clear_attempts(session, attempts)
     if password_hash_needs_update(user.password_hash):
         user.password_hash = hash_password(password)
+    append_audit(session, user, "auth.login_succeeded", "user:%d" % user.id)
     session.commit()
     return user

@@ -221,6 +221,9 @@ class AdminChain(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_log"
+    __table_args__ = (
+        UniqueConstraint("entry_hash", name="uq_audit_log_entry_hash"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -228,3 +231,5 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     target: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    previous_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    entry_hash: Mapped[str] = mapped_column(String(64), nullable=False)
