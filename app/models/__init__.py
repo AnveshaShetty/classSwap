@@ -12,6 +12,7 @@ from app.models.entities import (
     Subject,
     Substitution,
     Timetable,
+    TotpBackupCode,
     User,
 )
 
@@ -29,5 +30,6 @@ __all__ = [
     "Subject",
     "Substitution",
     "Timetable",
+    "TotpBackupCode",
     "User",
 ]

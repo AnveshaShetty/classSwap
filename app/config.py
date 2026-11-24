@@ -1,5 +1,6 @@
 from typing import Literal
 
+from cryptography.fernet import Fernet
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     smtp_username: str | None = None
     smtp_password: str | None = None
     smtp_from_address: str = "ClassSwap <no-reply@classswap.local>"
+    totp_encryption_key: str = ""
     max_period: int = 7
     break_after: str = "2,4"
     subject_match_weight: float = 0.35
@@ -66,6 +68,10 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires SMTP_HOST for password-reset delivery.")
             if not self.app_base_url.startswith("https://"):
                 raise ValueError("Production requires an HTTPS APP_BASE_URL.")
+            try:
+                Fernet(self.totp_encryption_key.encode("ascii"))
+            except (UnicodeEncodeError, ValueError, TypeError) as error:
+                raise ValueError("Production requires a valid TOTP_ENCRYPTION_KEY.") from error
         return self
 
     @property

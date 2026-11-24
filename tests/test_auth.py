@@ -5,6 +5,8 @@ import pytest
 import jwt
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+import pyotp
+from cryptography.fernet import Fernet
 from passlib.context import CryptContext
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -277,6 +279,90 @@ def test_password_reset_request_does_not_disclose_email_existence(
 
     assert known.status_code == unknown.status_code == 202
     assert known.json() == unknown.json()
+
+
+def test_admin_actions_require_totp_or_a_single_use_backup_code(
+    auth_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "totp_encryption_key",
+        Fernet.generate_key().decode("ascii"),
+    )
+    auth_client.cookies.clear()
+    login = auth_client.post(
+        "/auth/login",
+        json={"email": "meera.shenoy@demo.edu", "password": "demo123"},
+    )
+    assert login.status_code == 200
+
+    setup = auth_client.post("/auth/totp/setup")
+    assert setup.status_code == 200
+    secret = setup.json()["secret"]
+    enabled = auth_client.post(
+        "/auth/totp/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+    backup_code = enabled.json()["backup_codes"][0]
+
+    assert enabled.status_code == 200
+    assert len(enabled.json()["backup_codes"]) == 10
+    assert auth_client.get("/admin/chain").status_code == 403
+    assert auth_client.get(
+        "/admin/chain",
+        headers={"X-TOTP-Code": pyotp.TOTP(secret).now()},
+    ).status_code == 200
+    assert auth_client.get(
+        "/admin/chain",
+        headers={"X-TOTP-Code": backup_code},
+    ).status_code == 200
+    assert auth_client.get(
+        "/admin/chain",
+        headers={"X-TOTP-Code": backup_code},
+    ).status_code == 403
+
+
+def test_super_admin_can_force_logout_user_with_totp(
+    auth_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "totp_encryption_key",
+        Fernet.generate_key().decode("ascii"),
+    )
+    faculty_login = auth_client.post(
+        "/auth/login",
+        json={"email": "arjun.kulkarni@demo.edu", "password": "demo123"},
+    )
+    faculty_id = faculty_login.json()["id"]
+    faculty_token = auth_client.cookies.get(settings.auth_cookie_name)
+    assert faculty_login.status_code == 200 and faculty_token
+    auth_client.cookies.clear()
+
+    admin_login = auth_client.post(
+        "/auth/login",
+        json={"email": "principal.demo@demo.edu", "password": "demo123"},
+    )
+    assert admin_login.status_code == 200
+    setup = auth_client.post("/auth/totp/setup")
+    secret = setup.json()["secret"]
+    enabled = auth_client.post(
+        "/auth/totp/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+    assert enabled.status_code == 200
+
+    forced = auth_client.post(
+        f"/admin/users/{faculty_id}/force-logout",
+        headers={"X-TOTP-Code": pyotp.TOTP(secret).now()},
+    )
+    auth_client.cookies.clear()
+    auth_client.cookies.set(settings.auth_cookie_name, faculty_token)
+
+    assert forced.status_code == 204
+    assert auth_client.get("/me").status_code == 401
 
 
 def test_tokens_reject_none_and_non_hs256_algorithms() -> None:

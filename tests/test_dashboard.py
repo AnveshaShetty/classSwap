@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
+import pyotp
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.engine import Engine
@@ -9,6 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from app.config import settings
+from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
 from app.main import app
 from app.models import Absence, Substitution, Timetable, User
@@ -51,10 +55,20 @@ def dashboard_context() -> Iterator[tuple[TestClient, Engine, User]]:
     test_engine.dispose()
 
 
-def _act_as_hod(test_engine: Engine) -> None:
+def _act_as_hod(
+    client: TestClient,
+    test_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     with Session(test_engine) as session:
         hod = session.scalar(select(User).where(User.role == "hod"))
         assert hod is not None
+        secret = pyotp.random_base32()
+        monkeypatch.setattr(
+            settings,
+            "totp_encryption_key",
+            Fernet.generate_key().decode("ascii"),
+        )
         current_user = User(
             id=hod.id,
             name=hod.name,
@@ -63,8 +77,11 @@ def _act_as_hod(test_engine: Engine) -> None:
             role=hod.role,
             department=hod.department,
             teaches=hod.teaches,
+            totp_secret_encrypted=encrypt_totp_secret(secret),
+            totp_enabled=True,
         )
     app.dependency_overrides[get_current_user] = lambda: current_user
+    client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
 
 
 def test_dashboard_api_and_page_use_stored_absence_data(
@@ -107,10 +124,11 @@ def test_dashboard_api_and_page_use_stored_absence_data(
 
 def test_monthly_report_csv_contains_seeded_rows_and_statuses(
     dashboard_context: tuple[TestClient, Engine, User],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, test_engine, _ = dashboard_context
     assert client.get("/reports").status_code == 403
-    _act_as_hod(test_engine)
+    _act_as_hod(client, test_engine, monkeypatch)
 
     response = client.get("/reports/monthly", params={"month": "2026-11"})
 
@@ -132,9 +150,10 @@ def test_monthly_report_csv_contains_seeded_rows_and_statuses(
 def test_monthly_report_rejects_invalid_month(
     dashboard_context: tuple[TestClient, Engine, User],
     month: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, test_engine, _ = dashboard_context
-    _act_as_hod(test_engine)
+    _act_as_hod(client, test_engine, monkeypatch)
 
     response = client.get("/reports/monthly", params={"month": month})
 

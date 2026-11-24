@@ -40,6 +40,14 @@ class User(Base):
         server_default=text("false"),
     )
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    totp_secret_encrypted: Mapped[str | None] = mapped_column(String(255))
+    totp_pending_secret_encrypted: Mapped[str | None] = mapped_column(String(255))
+    totp_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
 
 
 class LoginAttempt(Base):
@@ -65,6 +73,17 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TotpBackupCode(Base):
+    __tablename__ = "totp_backup_codes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "code_hash", name="uq_totp_backup_user_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
 class Subject(Base):

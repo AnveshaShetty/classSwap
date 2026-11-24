@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+import pyotp
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import Engine
@@ -9,6 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from app.config import settings
+from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
 from app.main import app
 from app.models import Room, Section, Timetable, User
@@ -16,7 +20,9 @@ from scripts.seed import load_seed
 
 
 @pytest.fixture
-def timetable_context() -> Iterator[tuple[TestClient, Engine]]:
+def timetable_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, Engine]]:
     test_engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -31,18 +37,29 @@ def timetable_context() -> Iterator[tuple[TestClient, Engine]]:
         with Session(test_engine) as session:
             yield session
 
-    hod = User(
-        id=1,
-        name="Demo HOD",
-        email="meera.shenoy@demo.edu",
-        password_hash="",
-        role="hod",
-        department="Computer Science and Design",
-        teaches=True,
-    )
+    secret = pyotp.random_base32()
+    monkeypatch.setattr(settings, "totp_encryption_key", Fernet.generate_key().decode("ascii"))
+    with Session(test_engine) as session:
+        hod_row = session.scalar(select(User).where(User.email == "meera.shenoy@demo.edu"))
+        assert hod_row is not None
+        hod_row.totp_secret_encrypted = encrypt_totp_secret(secret)
+        hod_row.totp_enabled = True
+        hod = User(
+            id=hod_row.id,
+            name=hod_row.name,
+            email=hod_row.email,
+            password_hash=hod_row.password_hash,
+            role=hod_row.role,
+            department=hod_row.department,
+            teaches=hod_row.teaches,
+            totp_secret_encrypted=hod_row.totp_secret_encrypted,
+            totp_enabled=True,
+        )
+        session.commit()
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: hod
     with TestClient(app, base_url="https://testserver") as client:
+        client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
         yield client, test_engine
     app.dependency_overrides.clear()
     test_engine.dispose()

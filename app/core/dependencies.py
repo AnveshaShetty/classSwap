@@ -1,16 +1,54 @@
 from collections.abc import Callable
-
+import hmac
 from datetime import date, datetime, timedelta, timezone
 
+from cryptography.fernet import InvalidToken
 from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_db
 from app.core.security import create_access_token, decode_access_token
-from app.models import User
+from app.core.totp import decrypt_totp_secret, hash_backup_code, verify_totp
+from app.database import get_db
+from app.models import TotpBackupCode, User
 from app.services.admin import AdminNotFound, get_acting_admin
+
+
+def _require_admin_mfa(user: User, request: Request, session: Session) -> None:
+    if user.role not in {"hod", "super_admin"}:
+        return
+    if not user.totp_enabled or not user.totp_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Set up two-factor authentication before using admin features.",
+        )
+
+    code = request.headers.get("X-TOTP-Code", "")
+    try:
+        secret = decrypt_totp_secret(user.totp_secret_encrypted)
+    except (InvalidToken, UnicodeDecodeError, RuntimeError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A valid two-factor code is required.",
+        ) from None
+    if verify_totp(secret, code):
+        return
+
+    code_hash = hash_backup_code(code)
+    backup = session.scalar(
+        select(TotpBackupCode)
+        .where(TotpBackupCode.user_id == user.id, TotpBackupCode.code_hash == code_hash)
+        .with_for_update()
+    )
+    if backup is not None and hmac.compare_digest(backup.code_hash, code_hash):
+        session.delete(backup)
+        session.commit()
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="A valid two-factor code is required.",
+    )
 
 
 def get_current_user(
@@ -54,6 +92,15 @@ def get_current_user(
     return user
 
 
+def require_admin_mfa(
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> User:
+    _require_admin_mfa(user, request, session)
+    return user
+
+
 def require_roles(*allowed_roles: str) -> Callable[..., User]:
     if not allowed_roles:
         raise ValueError("At least one role must be allowed.")
@@ -74,10 +121,12 @@ def require_acting_admin(permission: str) -> Callable[..., User]:
         raise ValueError("An admin permission is required.")
 
     def acting_admin_guard(
+        request: Request,
         user: User = Depends(get_current_user),
         session: Session = Depends(get_db),
     ) -> User:
         if user.role == "super_admin":
+            _require_admin_mfa(user, request, session)
             return user
         try:
             acting_user, _ = get_acting_admin(session, user.department, date.today())
@@ -96,6 +145,7 @@ def require_acting_admin(permission: str) -> Callable[..., User]:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Stand-in admins may only manage substitutions and reports.",
             )
+        _require_admin_mfa(user, request, session)
         return user
 
     return acting_admin_guard

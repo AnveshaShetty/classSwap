@@ -1,16 +1,28 @@
+import secrets
+
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_roles
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.totp import (
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    hash_backup_code,
+    new_totp_secret,
+    provisioning_uri,
+    verify_totp,
+)
 from app.database import get_db
-from app.models import User
+from app.models import TotpBackupCode, User
 from app.schemas.auth import (
     LoginRequest,
     PasswordChangeRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
+    TotpCodeRequest,
     UserRead,
 )
 from app.services.auth import (
@@ -119,6 +131,65 @@ def confirm_password_reset(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This password reset link is invalid or has expired.",
         )
+
+
+@router.post("/auth/totp/setup")
+def setup_totp(
+    current_user: User = Depends(require_roles("hod", "super_admin")),
+    session: Session = Depends(get_db),
+) -> dict[str, str]:
+    if current_user.totp_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Two-factor authentication is already enabled.",
+        )
+    try:
+        secret = new_totp_secret()
+        encrypted = encrypt_totp_secret(secret)
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail="Two-factor setup is not configured.") from error
+    current_user.totp_pending_secret_encrypted = encrypted
+    session.commit()
+    return {
+        "secret": secret,
+        "provisioning_uri": provisioning_uri(secret, current_user.email),
+    }
+
+
+@router.post("/auth/totp/enable")
+def enable_totp(
+    payload: TotpCodeRequest,
+    current_user: User = Depends(require_roles("hod", "super_admin")),
+    session: Session = Depends(get_db),
+) -> dict[str, list[str]]:
+    encrypted = current_user.totp_pending_secret_encrypted
+    if not encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Start two-factor setup before enabling it.",
+        )
+    try:
+        secret = decrypt_totp_secret(encrypted)
+    except (InvalidToken, RuntimeError, UnicodeDecodeError) as error:
+        raise HTTPException(status_code=503, detail="Two-factor setup could not be completed.") from error
+    if not verify_totp(secret, payload.code):
+        raise HTTPException(status_code=400, detail="The two-factor code is invalid.")
+
+    backup_codes = [secrets.token_urlsafe(12) for _ in range(10)]
+    current_user.totp_secret_encrypted = encrypted
+    current_user.totp_pending_secret_encrypted = None
+    current_user.totp_enabled = True
+    session.add_all(
+        [
+            TotpBackupCode(
+                user_id=current_user.id,
+                code_hash=hash_backup_code(code),
+            )
+            for code in backup_codes
+        ]
+    )
+    session.commit()
+    return {"backup_codes": backup_codes}
 
 
 @router.get("/me", response_model=UserRead)

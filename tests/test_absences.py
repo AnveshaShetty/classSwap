@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from datetime import date, timedelta
 
 import pytest
+import pyotp
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import Engine
@@ -9,6 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from app.config import settings
+from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
 from app.main import app
 from app.models import Absence, AdminChain, AuditLog, Leave, Substitution, Timetable, User
@@ -451,12 +455,21 @@ def test_stand_in_admin_cannot_import_timetable(
 
 def test_acting_hod_can_edit_chain_and_the_change_is_audited(
     absence_context: tuple[TestClient, Engine, User],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, test_engine, _ = absence_context
     with Session(test_engine) as session:
         hod = session.scalar(select(User).where(User.role == "hod"))
         assert hod is not None
+        secret = pyotp.random_base32()
+        monkeypatch.setattr(
+            settings,
+            "totp_encryption_key",
+            Fernet.generate_key().decode("ascii"),
+        )
         hod_user = _copy_user(session, hod.id)
+        hod_user.totp_secret_encrypted = encrypt_totp_secret(secret)
+        hod_user.totp_enabled = True
         chain = [
             {"position": entry.position, "email": user.email}
             for entry, user in session.execute(
@@ -464,6 +477,7 @@ def test_acting_hod_can_edit_chain_and_the_change_is_audited(
             )
         ]
     app.dependency_overrides[get_current_user] = lambda: hod_user
+    client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
 
     response = client.put(
         "/admin/chain",

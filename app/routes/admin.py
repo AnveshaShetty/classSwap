@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_acting_admin
+from app.core.dependencies import get_current_user, require_acting_admin, require_admin_mfa, require_roles
 from app.database import get_db
 from app.models import User
 from app.schemas.admin import (
@@ -46,6 +46,20 @@ def read_acting_admin(
         department=user.department,
         position=position,
     )
+
+
+@router.post("/admin/users/{user_id}/force-logout", status_code=status.HTTP_204_NO_CONTENT)
+def force_logout_user(
+    user_id: int,
+    actor: User = Depends(require_roles("super_admin")),
+    _: User = Depends(require_admin_mfa),
+    session: Session = Depends(get_db),
+) -> None:
+    target = session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    target.token_version += 1
+    session.commit()
 
 
 @router.get("/admin/chain", response_model=AdminChainRead)

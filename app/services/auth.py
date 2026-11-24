@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.security import (
     dummy_password_hash,
     hash_password,
@@ -47,7 +48,11 @@ def validate_new_password(password: str, name: str, email: str) -> None:
 
 
 def _key_hash(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return hmac.new(
+        settings.jwt_secret_key.encode("utf-8"),
+        value.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def _now_utc() -> datetime:
