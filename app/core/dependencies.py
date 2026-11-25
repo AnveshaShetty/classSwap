@@ -9,7 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.security import create_access_token, decode_access_token
+from app.core.security import (
+    ADMIN_MFA_COOKIE_NAME,
+    create_access_token,
+    decode_access_token,
+    verify_admin_mfa_token,
+)
 from app.core.authorization import can_act_as_admin
 from app.core.totp import decrypt_totp_secret, hash_backup_code, verify_totp
 from app.database import get_db
@@ -18,6 +23,29 @@ from app.services.admin import AdminNotFound, get_acting_admin
 
 
 security_logger = logging.getLogger("app.security")
+
+
+def verify_admin_mfa_code(user: User, code: str, session: Session) -> bool:
+    if not user.totp_secret_encrypted:
+        return False
+    try:
+        secret = decrypt_totp_secret(user.totp_secret_encrypted)
+    except (InvalidToken, UnicodeDecodeError, RuntimeError):
+        return False
+    if verify_totp(secret, code):
+        return True
+
+    code_hash = hash_backup_code(code)
+    backup = session.scalar(
+        select(TotpBackupCode)
+        .where(TotpBackupCode.user_id == user.id, TotpBackupCode.code_hash == code_hash)
+        .with_for_update()
+    )
+    if backup is None or not hmac.compare_digest(backup.code_hash, code_hash):
+        return False
+    session.delete(backup)
+    session.commit()
+    return True
 
 
 def _require_admin_mfa(user: User, request: Request, session: Session) -> None:
@@ -33,26 +61,14 @@ def _require_admin_mfa(user: User, request: Request, session: Session) -> None:
             detail="Set up two-factor authentication before using admin features.",
         )
 
-    code = request.headers.get("X-TOTP-Code", "")
-    try:
-        secret = decrypt_totp_secret(user.totp_secret_encrypted)
-    except (InvalidToken, UnicodeDecodeError, RuntimeError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="A valid two-factor code is required.",
-        ) from None
-    if verify_totp(secret, code):
+    if verify_admin_mfa_token(
+        request.cookies.get(ADMIN_MFA_COOKIE_NAME),
+        user.id,
+        user.token_version,
+    ):
         return
 
-    code_hash = hash_backup_code(code)
-    backup = session.scalar(
-        select(TotpBackupCode)
-        .where(TotpBackupCode.user_id == user.id, TotpBackupCode.code_hash == code_hash)
-        .with_for_update()
-    )
-    if backup is not None and hmac.compare_digest(backup.code_hash, code_hash):
-        session.delete(backup)
-        session.commit()
+    if verify_admin_mfa_code(user, request.headers.get("X-TOTP-Code", ""), session):
         return
     security_logger.warning(
         "Admin MFA denied",

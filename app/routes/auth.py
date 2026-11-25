@@ -3,15 +3,22 @@ import secrets
 
 from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.audit import append_audit
 from app.core.csrf import require_csrf
-from app.core.dependencies import get_current_user, require_roles
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.dependencies import get_current_user, require_roles, verify_admin_mfa_code
+from app.core.security import (
+    ADMIN_MFA_COOKIE_NAME,
+    ADMIN_MFA_SESSION_LIFETIME,
+    create_access_token,
+    create_admin_mfa_token,
+    hash_password,
+    verify_password,
+)
 from app.core.totp import (
     decrypt_totp_secret,
     encrypt_totp_secret,
@@ -39,6 +46,7 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetRequest,
     TotpCodeRequest,
+    TotpVerifyRequest,
     UserRead,
 )
 from app.services.auth import (
@@ -90,16 +98,28 @@ def login(
     return user
 
 
-@router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/auth/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    responses={303: {"description": "Browser logout redirects to sign-in."}},
+)
 def logout(
+    request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
-) -> None:
+) -> RedirectResponse | None:
     current_user.token_version += 1
     append_audit(session, current_user, "auth.logout", "user:%d" % current_user.id)
     session.commit()
+    if "text/html" in request.headers.get("accept", "").lower():
+        redirect = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+        redirect.delete_cookie(settings.auth_cookie_name, path="/")
+        redirect.delete_cookie(ADMIN_MFA_COOKIE_NAME, path="/")
+        return redirect
     response.delete_cookie(settings.auth_cookie_name, path="/")
+    response.delete_cookie(ADMIN_MFA_COOKIE_NAME, path="/")
 
 
 @router.post("/auth/change-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -124,6 +144,7 @@ def change_password(
     append_audit(session, current_user, "auth.password_changed", "user:%d" % current_user.id)
     session.commit()
     response.delete_cookie(settings.auth_cookie_name, path="/")
+    response.delete_cookie(ADMIN_MFA_COOKIE_NAME, path="/")
 
 
 @router.post(
@@ -221,6 +242,40 @@ def enable_totp(
     )
     session.commit()
     return {"backup_codes": backup_codes}
+
+
+@router.post("/auth/totp/verify")
+def verify_totp_for_admin(
+    payload: TotpVerifyRequest,
+    response: Response,
+    current_user: User = Depends(require_roles("hod", "super_admin")),
+    session: Session = Depends(get_db),
+) -> dict[str, bool]:
+    if not current_user.totp_enabled or not current_user.totp_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Set up two-factor authentication before using admin features.",
+        )
+    if not verify_admin_mfa_code(current_user, payload.code, session):
+        security_logger.warning(
+            "Admin MFA denied",
+            extra={"user_id": current_user.id, "action": "mfa.invalid_code"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A valid two-factor code is required.",
+        )
+
+    response.set_cookie(
+        key=ADMIN_MFA_COOKIE_NAME,
+        value=create_admin_mfa_token(current_user.id, current_user.token_version),
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        max_age=int(ADMIN_MFA_SESSION_LIFETIME.total_seconds()),
+        path="/",
+    )
+    return {"verified": True}
 
 
 @router.get("/me", response_model=UserRead)

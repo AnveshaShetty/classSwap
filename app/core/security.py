@@ -20,6 +20,8 @@ password_context = CryptContext(
 dummy_password_hash = password_context.hash(secrets.token_urlsafe(32))
 ABSOLUTE_SESSION_LIFETIME = timedelta(hours=8)
 SLIDING_REFRESH_WINDOW = timedelta(minutes=10)
+ADMIN_MFA_SESSION_LIFETIME = timedelta(minutes=5)
+ADMIN_MFA_COOKIE_NAME = "__Host-classswap_mfa"
 
 
 class AccessTokenClaims(TypedDict):
@@ -107,6 +109,42 @@ def decode_access_token(token: str) -> AccessTokenClaims | None:
     if datetime.now(timezone.utc).timestamp() >= claims["abs_exp"]:
         return None
     return cast(AccessTokenClaims, claims)
+
+
+def create_admin_mfa_token(user_id: int, token_version: int) -> str:
+    issued_at = datetime.now(timezone.utc)
+    claims = {
+        "sub": str(user_id),
+        "iat": issued_at,
+        "exp": issued_at + ADMIN_MFA_SESSION_LIFETIME,
+        "jti": secrets.token_urlsafe(16),
+        "ver": token_version,
+        "purpose": "admin_mfa",
+    }
+    return jwt.encode(claims, settings.jwt_secret_key, algorithm="HS256")
+
+
+def verify_admin_mfa_token(
+    token: str | None,
+    user_id: int,
+    token_version: int,
+) -> bool:
+    if not token:
+        return False
+    try:
+        claims = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=["HS256"],
+            options={"require": ["sub", "iat", "exp", "jti", "ver", "purpose"]},
+        )
+    except jwt.InvalidTokenError:
+        return False
+    return (
+        claims.get("purpose") == "admin_mfa"
+        and claims.get("sub") == str(user_id)
+        and claims.get("ver") == token_version
+    )
 
 
 def get_token_user_id(token: str) -> int | None:

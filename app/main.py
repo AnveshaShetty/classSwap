@@ -1,11 +1,12 @@
 import secrets
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -129,7 +130,7 @@ async def set_security_headers(request: Request, call_next):
         "default-src 'self'; "
         "script-src 'self' 'nonce-%s' https://unpkg.com; "
         "style-src 'self' 'nonce-%s'; "
-        "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
+        "img-src 'self' data: https://images.unsplash.com; font-src 'self' data:; connect-src 'self'; "
         "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     ) % (nonce, nonce)
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -156,7 +157,24 @@ def health_check() -> dict[str, str]:
 
 
 @app.exception_handler(StarletteHTTPException)
-async def http_error_page(request: Request, exc: StarletteHTTPException) -> HTMLResponse | JSONResponse:
+async def http_error_page(request: Request, exc: StarletteHTTPException) -> Response:
+    if (
+        exc.status_code == 403
+        and isinstance(exc.detail, str)
+        and exc.detail in {
+            "Set up two-factor authentication before using admin features.",
+            "A valid two-factor code is required.",
+        }
+        and request.url.path in {"/reports", "/reports/monthly"}
+        and "text/html" in request.headers.get("accept", "").lower()
+    ):
+        next_url = request.url.path
+        if request.url.query:
+            next_url += "?" + request.url.query
+        return RedirectResponse(
+            url="/security/two-factor?" + urlencode({"next": next_url}),
+            status_code=303,
+        )
     if exc.status_code == 404:
         if request.url.path.startswith("/api") or "application/json" in request.headers.get("accept", ""):
             return JSONResponse(status_code=404, content={"detail": "The requested resource could not be found."})

@@ -260,6 +260,28 @@ def test_logout_invalidates_previously_issued_token(auth_client: TestClient) -> 
     assert auth_client.get("/me").status_code == 401
 
 
+def test_browser_logout_redirects_to_login(auth_client: TestClient) -> None:
+    auth_client.cookies.clear()
+    configure_csrf_client(auth_client)
+    login = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+    assert login.status_code == 200
+    assert auth_client.cookies.get(settings.auth_cookie_name)
+
+    logout_response = auth_client.post(
+        "/auth/logout",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+
+    assert logout_response.status_code == 303
+    assert logout_response.headers["location"] == "/login"
+    assert auth_client.cookies.get(settings.auth_cookie_name) is None
+    assert auth_client.get("/me").status_code == 401
+
+
 def test_password_change_invalidates_old_token(auth_client: TestClient) -> None:
     auth_client.cookies.delete(settings.auth_cookie_name)
     login = auth_client.post(
@@ -392,6 +414,18 @@ def test_admin_actions_require_totp_or_a_single_use_backup_code(
         "/admin/chain",
         headers={"X-TOTP-Code": backup_code},
     ).status_code == 403
+    step_up = auth_client.post(
+        "/auth/totp/verify",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+    assert step_up.status_code == 200
+    assert auth_client.get("/admin/chain").status_code == 200
+    mfa_cookie = next(
+        cookie for cookie in step_up.headers.get_list("set-cookie")
+        if "__Host-classswap_mfa=" in cookie
+    )
+    assert "httponly" in mfa_cookie.lower()
+    assert "max-age=300" in mfa_cookie.lower()
 
 
 def test_super_admin_can_force_logout_user_with_totp(

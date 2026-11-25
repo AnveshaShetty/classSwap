@@ -34,6 +34,12 @@ class TotpCodeRequest(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class TotpVerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(pattern=r"^(?:\d{6}|[A-Za-z0-9_-]{16})$")
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

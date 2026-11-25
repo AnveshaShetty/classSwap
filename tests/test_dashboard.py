@@ -122,6 +122,12 @@ def test_dashboard_api_and_page_use_stored_absence_data(
     assert page.status_code == 200
     assert "Absence register" in page.text
     assert "Medical leave" in page.text
+    assert 'src="https://images.unsplash.com/' in page.text
+    assert "img-src 'self' data: https://images.unsplash.com;" in page.headers[
+        "content-security-policy"
+    ]
+    assert ".logout-link:hover" in page.text
+    assert "background: transparent;" in page.text
 
 
 def test_stored_user_content_is_html_escaped(
@@ -178,6 +184,61 @@ def test_monthly_report_csv_contains_seeded_rows_and_statuses(
     assert page.status_code == 200
     assert "Monthly report" in page.text
     assert "2026-11-02" in page.text
+    assert 'src="https://images.unsplash.com/' in page.text
+    assert "img-src 'self' data: https://images.unsplash.com;" in page.headers[
+        "content-security-policy"
+    ]
+
+
+def test_unenrolled_hod_is_guided_through_mfa_before_viewing_reports(
+    dashboard_context: tuple[TestClient, Engine, User],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, test_engine, _ = dashboard_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.role == "hod"))
+        assert hod is not None
+        current_user = User(
+            id=hod.id,
+            name=hod.name,
+            email=hod.email,
+            password_hash=hod.password_hash,
+            role=hod.role,
+            department=hod.department,
+            teaches=hod.teaches,
+            token_version=hod.token_version,
+        )
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    client.headers["Accept"] = "text/html"
+
+    response = client.get("/reports", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(
+        "/security/two-factor?next=%2Freports"
+    )
+    setup_page = client.get(response.headers["location"])
+    assert setup_page.status_code == 200
+    assert "Set up two-factor authentication" in setup_page.text
+
+    secret = pyotp.random_base32()
+    monkeypatch.setattr(
+        settings,
+        "totp_encryption_key",
+        Fernet.generate_key().decode("ascii"),
+    )
+    current_user.totp_secret_encrypted = encrypt_totp_secret(secret)
+    current_user.totp_enabled = True
+    verification = client.post(
+        "/auth/totp/verify",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+
+    assert verification.status_code == 200
+    assert client.cookies.get("__Host-classswap_mfa")
+    report = client.get("/reports")
+    assert report.status_code == 200
+    assert "Monthly report" in report.text
 
 
 @pytest.mark.parametrize("month", ["2026-13", "November 2026", "2026-2"])

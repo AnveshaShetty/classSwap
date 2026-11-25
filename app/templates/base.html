@@ -110,7 +110,20 @@
     }
     .user-name { color: #f1f5f3; font-size: 12px; font-weight: 650; }
     .user-role { color: #9db1b4; display: block; font-size: 10px; text-transform: capitalize; }
-    .logout-link { color: #aec2c3; display: block; font-size: 12px; padding: 8px; }
+    .logout-link {
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      color: #aec2c3;
+      display: block;
+      font-size: 12px;
+      padding: 8px;
+      text-align: left;
+      transition: background .16s ease, color .16s ease;
+      width: 100%;
+    }
+    .logout-link:hover { background: rgba(226, 242, 235, .12); color: #fff; }
+    .logout-link:focus-visible { outline: 2px solid #d7eee3; outline-offset: 2px; }
     .main-shell { margin-left: 248px; min-height: 100vh; }
     .topbar {
       align-items: center;

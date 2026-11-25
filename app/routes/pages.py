@@ -1,14 +1,15 @@
 from datetime import date
 from typing import Literal
+from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.authorization import can_access_absence
 from app.config import settings
 from app.core.csrf import require_csrf
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_roles
 from app.core.templating import templates
 from app.database import get_db
 from app.models import Section, Subject, Timetable, User
@@ -56,6 +57,36 @@ def reset_password_page(request: Request) -> HTMLResponse:
         request=request,
         name="reset_password.html",
         context={"request": request},
+    )
+
+
+@router.get("/security/two-factor", response_class=HTMLResponse)
+def two_factor_page(
+    request: Request,
+    next_url: str = Query(default="/dashboard", alias="next"),
+    current_user: User = Depends(require_roles("hod", "super_admin")),
+    session: Session = Depends(get_db),
+) -> HTMLResponse:
+    parsed_next = urlsplit(next_url)
+    if (
+        parsed_next.scheme
+        or parsed_next.netloc
+        or not parsed_next.path.startswith("/")
+        or parsed_next.path.startswith("//")
+        or "\\" in next_url
+    ):
+        next_url = "/dashboard"
+    return templates.TemplateResponse(
+        request=request,
+        name="two_factor.html",
+        context={
+            "request": request,
+            "current_user": current_user,
+            "today": date.today().isoformat(),
+            "can_view_reports": _can_view_reports(session, current_user),
+            "totp_enabled": current_user.totp_enabled,
+            "redirect_to": next_url,
+        },
     )
 
 
