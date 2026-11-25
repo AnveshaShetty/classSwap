@@ -55,13 +55,13 @@ validated.
 
 ### Phase 0 findings
 
-| # | Severity | File | Lines | Vulnerability | Confidence |
-|---|----------|------|-------|---------------|------------|
-| 1 | HIGH | `app/config.py`, `docker-compose.yml` | 8; 22 | A known fallback JWT signing key can allow token forgery when deployed without an explicit secret. | 10/10 |
-| 2 | MEDIUM | `app/config.py`, `app/routes/auth.py` | 12; 33 | The cookie security setting defaults to false and the default deployment uses HTTP. | 9/10 |
-| 3 | MEDIUM | `app/routes/absence.py`, `app/routes/substitution.py`, `app/routes/pages.py`, `app/services/absence.py`, `app/services/suggestion.py` | 46–54; 82–90; 137–145; 102–103; 160–161 | Authenticated routes load absence-related data by ID without consistently checking its owner/department, enabling IDOR/BOLA. | 10/10 |
-| 4 | MEDIUM | `app/routes/admin.py` | 31–45 | An authenticated caller can select another department when retrieving its acting administrator. | 9/10 |
-| 5 | MEDIUM | `app/templates/base.html` | 13–14 | External JavaScript assets are loaded without Subresource Integrity. | 8/10 |
+| # | Severity | Initial finding | Current disposition |
+|---|----------|-----------------|----------------------|
+| 1 | HIGH | A known fallback JWT signing key could allow token forgery when deployed without an explicit secret. | Addressed in code: startup rejects missing, short, or placeholder production secrets; retain secret-vault and rotation controls operationally. |
+| 2 | MEDIUM | Cookie/transport defaults could permit insecure production sessions. | Addressed in code: Secure `__Host-` cookies and production HTTPS/configuration validation; ingress behavior still requires deployment verification. |
+| 3 | MEDIUM | Absence-related records were not consistently scoped to their owner/department (IDOR/BOLA). | Partially addressed: ownership policies and regression tests exist; complete route/object matrix and PostgreSQL race tests remain open. |
+| 4 | MEDIUM | Acting-admin lookup accepted a caller-selected department. | Addressed in code: the acting-admin department is derived from the authenticated user. |
+| 5 | MEDIUM | External JavaScript assets lacked Subresource Integrity. | Addressed in code: browser scripts are version-pinned and integrity-checked; CDN availability remains a dependency. |
 
 Planned fixes: fail closed on missing/placeholder signing secrets; enforce
 production cookie and transport settings; centralize and enforce object-level
@@ -70,7 +70,7 @@ third-party scripts.
 
 ## Phase 1: authentication and sessions
 
-**Status: partial.** Implemented production secret validation, a pinned HS256
+**Status: implemented (deployment validation pending).** Implemented production secret validation, a pinned HS256
 algorithm, Secure `__Host-` cookies, Argon2id password hashing with bcrypt
 rehashing on successful login, generic login errors with a dummy hash check,
 database-backed per-account/per-IP lockout, password policy validation and
@@ -106,12 +106,15 @@ secrets or insecure cookie configuration. The local `__Host-` cookie is marked
 Secure, which requires HTTPS (localhost is typically treated as a secure
 context by browsers). Successful password changes revoke existing sessions.
 Five failed attempts trigger a 15-minute lockout with exponential backoff.
-Admin-only actions require an `X-TOTP-Code` header after enrollment; backup
-codes can be used once. Production now also requires SMTP, HTTPS
+Admin-only actions accept an `X-TOTP-Code` header or a five-minute, HTTP-only
+browser MFA cookie issued after code verification; backup codes can be used
+once. Browser access to reports guides unenrolled administrators through setup
+and prompts enrolled administrators for verification. Production now also requires SMTP, HTTPS
 `APP_BASE_URL`, and a valid `TOTP_ENCRYPTION_KEY`.
 
-Still open in this phase: no implementation items remain. MFA recovery/key
-rotation and operational delivery limits remain deployment concerns.
+Remaining Phase 1 work is operational: validate SMTP delivery and recovery
+procedures, and establish key rotation/backup handling. These do not replace
+the code-level regression evidence and are not represented as fully verified.
 
 ## Phase 2: authorization and object access
 
@@ -382,10 +385,11 @@ After review, restore the remote and force-push all branches and tags during a
 coordinated maintenance window; collaborators must re-clone. Do not run this
 history rewrite casually.
 
-Remaining Phase 7 work: resolve the High Debian OS findings and rerun Trivy;
-exercise PostgreSQL role grants and production migrations; scan the actual
-deployment image and ingress configuration; and validate Dependabot/CI
-execution on the remote runner.
+Remaining Phase 7 work: exercise PostgreSQL role grants and production
+migrations; scan the actual deployment image and ingress configuration; and
+validate Dependabot/CI execution on the remote runner. The earlier Debian
+image findings were addressed by moving to the digest-pinned Alpine base;
+re-run Trivy against the final image in the deployment environment.
 
 ### OWASP Top 10 (2021) initial mapping
 
@@ -396,7 +400,7 @@ execution on the remote runner.
 | A03 Injection | Not assessed exhaustively | Run targeted query review and add input/injection regression tests. |
 | A04 Insecure Design | Partial | Abuse cases above; review action-link, state-transition, and concurrency design. |
 | A05 Security Misconfiguration | Finding | Findings 1–2; secure deployment defaults, headers, host, CORS, and docs configuration. |
-| A06 Vulnerable and Outdated Components | Finding | pip-audit reported a pytest advisory; confirm/fix while preserving supported constraints. |
+| A06 Vulnerable and Outdated Components | Partial | Current pip-audit scans of runtime, development, and data locks are clean; validate on CI and the deployed image. |
 | A07 Identification and Authentication Failures | Findings | Findings 1–2; test authentication, lockout, session invalidation, reset, and MFA behavior. |
 | A08 Software and Data Integrity Failures | Finding | Finding 5; pin or self-host browser dependencies and review CI/build integrity. |
 | A09 Security Logging and Monitoring Failures | Not assessed exhaustively | Review audit immutability, security-event coverage, and secret redaction. |
@@ -404,21 +408,25 @@ execution on the remote runner.
 
 ### Scanner and test baseline
 
-- Bandit: `python -m bandit -q -r app scripts migrations data` scanned 3,573
-  lines and reported two Low `B311` pseudo-random-generator findings in
-  `data/gen_data.py` (lines 192 and 391); no Medium or High findings. Exit 1.
-- pip-audit: `python -m pip_audit -r requirements.txt` reported pytest 8.4.2
-  (`PYSEC-2026-1845`), with pytest 9.0.3 reported as the fixed version. Exit 1.
-- Semgrep: `p/python`, `p/fastapi`, and `p/jinja2` were not run because no
-  usable Semgrep CLI was available in the environment.
-- Baseline pytest: 38 passed and one failed. The failure is a stale hard-coded
-  cookie-name expectation in `tests/test_auth.py`; the configured app issues
-  `__Host-classswap_session`.
+- Bandit: `python -m bandit -q -r app scripts migrations data` scanned 5,417
+  lines and reported two Low `B311` findings in deterministic demo-data
+  generation (`data/gen_data.py` lines 192 and 391); no Medium or High
+  findings. These PRNG uses do not generate security tokens. Exit 1 because
+  Bandit reports Low findings by default.
+- pip-audit: current scans of `requirements.txt`, `requirements-dev.txt`, and
+  `data/requirements.txt` reported no known vulnerabilities.
+- Semgrep: `p/python`, `p/fastapi`, and `.semgrep/jinja.yml` ran 153 rules
+  against 64 tracked files with zero findings. The requested `p/jinja2`
+  registry preset could not be retrieved (HTTP 404); this run does not claim
+  that preset was executed.
+- Current full pytest suite: 99 passed (13 third-party deprecation warnings).
+  The earlier 38-pass/one-failure result was a stale cookie-name assertion
+  that has since been corrected.
 
 ### Scope and residual risk
 
-This phase is a code/configuration snapshot only. It does not prove that every
-route, workflow, deployment setting, or dependency is secure. No production
-penetration test, ZAP scan, Semgrep scan, container scan, or independent review
-has been completed. Phase status and further evidence must be updated as fixes
-and tests are implemented.
+This assessment is a code/configuration snapshot, not a penetration test or
+certification. The repository has local Semgrep and dependency-scan evidence,
+but a current ZAP baseline, production ingress validation, and independent
+penetration test remain outstanding. Phase status and evidence must be
+revalidated after implementation and in the deployment environment.
