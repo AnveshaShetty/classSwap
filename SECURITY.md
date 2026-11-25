@@ -316,6 +316,77 @@ personal data retained inside historical audit records. Database encryption
 at rest, field-level encryption beyond TOTP, and production backup/restore
 testing remain deployment responsibilities.
 
+## Phase 7: supply chain, containers, and CI
+
+**Status: partial.** Added hash-locked runtime, development, and data
+requirements compiled from their `.in` sources; `pip-audit` reports no known
+Python dependency vulnerabilities in any of the three locks. CI and
+pre-commit run pytest, Ruff, mypy, Bandit, pip-audit, Semgrep, Gitleaks, and a
+Trivy image scan. Scanner images and GitHub Actions are pinned. Dependabot
+covers pip and Docker. The Docker image uses a digest-pinned Python 3.14
+Alpine multi-stage build, installs dependencies with hashes, runs as a
+non-root user, removes pip from the runtime, and defines a health check.
+Production Compose has no host-published web or database ports, uses a
+read-only application filesystem, drops capabilities, and requires explicit
+production settings. The running image builds successfully.
+
+The requested Semgrep registry preset `p/jinja2` returns HTTP 404. Instead,
+CI uses `p/python`, `p/fastapi`, and `p/security-audit` plus the local
+`.semgrep/jinja.yml` rules that reject Jinja `safe` filters and Python
+`Markup(...)` calls. Bandit reports no High findings; Semgrep reports zero
+findings; Gitleaks scanned 37 commits and reported no leaks.
+
+The initial Debian slim base produced 53 High OS findings, so the image was
+changed to the digest-pinned Alpine base and all locked runtime packages were
+verified to install from hash-pinned musllinux wheels. Trivy 0.76.2 reports
+**0 High and 0 Critical** findings in the final Alpine image, including no
+vulnerable Python packages. No severity suppressions or ignored findings
+were used.
+
+Behavior changes: production Compose overrides development port bindings
+using Compose's `!reset` syntax; use a Compose version supporting that tag.
+The runtime image no longer contains pip. The Uvicorn `standard` extras were
+removed so a single hash lock installs on Windows and Linux; the server uses
+the default h11/asyncio implementation instead of optional accelerated
+transports. This can reduce throughput but does not change application
+protocol behavior.
+
+Regression/verification evidence: full pytest suite (97 passed),
+`python -m ruff check app scripts migrations tests data`,
+`python -m mypy app scripts`, high-severity Bandit, all three clean
+`pip-audit` lock scans, Semgrep (209 rules, zero findings), Gitleaks (37
+commits, zero leaks), successful Alpine Docker image build, Trivy (zero High
+or Critical findings), runtime import without pip, and Compose checks proving
+no production port bindings and a read-only web filesystem.
+
+Repository hygiene: `.env`, local database dumps, and local
+`seed_credentials.*` / `seed-credentials.*` files are ignored. No `.env` or
+database dump is tracked, and Gitleaks found no leaked secret. The public
+development-only demo password `demo123` does exist in historical
+`scripts/seed.py` commits; it is not a production credential and production
+seeding is refused. Treat it as public, never reuse it, and reset any account
+that may have used it outside development. If repository policy requires
+purging that historical string, first rotate/revoke any affected credentials
+and coordinate a full history rewrite from a fresh clone. For example, with
+`git-filter-repo` installed in PowerShell:
+
+```powershell
+@'
+demo123==>REMOVED-DEMO-CREDENTIAL
+'@ | Set-Content -Encoding utf8 replacements.txt
+git filter-repo --replace-text replacements.txt
+Remove-Item replacements.txt
+```
+
+After review, restore the remote and force-push all branches and tags during a
+coordinated maintenance window; collaborators must re-clone. Do not run this
+history rewrite casually.
+
+Remaining Phase 7 work: resolve the High Debian OS findings and rerun Trivy;
+exercise PostgreSQL role grants and production migrations; scan the actual
+deployment image and ingress configuration; and validate Dependabot/CI
+execution on the remote runner.
+
 ### OWASP Top 10 (2021) initial mapping
 
 | Category | Phase 0 status | Evidence / next step |

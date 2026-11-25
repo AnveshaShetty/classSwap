@@ -137,7 +137,7 @@ def build_dashboard_data(
             )
         )
     faculty = list(session.scalars(faculty_statement.order_by(User.name)))
-    fairness = [
+    fairness: list[dict[str, Any]] = [
         {
             "name": person.name,
             "email": person.email,
@@ -164,7 +164,9 @@ def build_dashboard_data(
     )
     if department:
         trend_statement = trend_statement.where(Subject.department == department)
-    trend_counts = dict(session.execute(trend_statement).all())
+    trend_counts: dict[date, int] = {
+        day: int(count) for day, count in session.execute(trend_statement).all()
+    }
     trend = [
         {
             "date": (trend_start + timedelta(days=index)).isoformat(),

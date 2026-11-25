@@ -99,8 +99,8 @@ def _validate_rows(session: Session, frame: pd.DataFrame) -> list[TimetableRow]:
     validated: list[TimetableRow] = []
     errors: list[dict[str, int | str]] = []
     section_slots: dict[tuple[int, str, int], int] = {}
-    faculty_slots: dict[tuple[int, int], int] = {}
-    room_slots: dict[tuple[int, int], int] = {}
+    faculty_slots: dict[tuple[int, int, int], int] = {}
+    room_slots: dict[tuple[int, int, int], int] = {}
 
     for offset, raw in enumerate(frame.to_dict(orient="records"), start=2):
         row_errors: list[str] = []

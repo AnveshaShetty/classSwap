@@ -69,7 +69,12 @@ def respond_to_request(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
     except SubstitutionConflict as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
-    return SubstitutionActionRead(substitution=substitution, next_request=next_request)
+    return SubstitutionActionRead(
+        substitution=SubstitutionRead.model_validate(substitution),
+        next_request=(
+            SubstitutionRead.model_validate(next_request) if next_request is not None else None
+        ),
+    )
 
 
 @router.get("/substitutions/inbox", response_model=list[InboxItemRead])

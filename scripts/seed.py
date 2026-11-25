@@ -141,12 +141,17 @@ def load_seed(session: Session, seed_dir: Path = SEED_DIR) -> dict[str, int]:
     for row in absence_rows:
         absent_date = date.fromisoformat(row["date"])
         day_number = absent_date.weekday()
-        timetable = timetable_by_slot.get((row["section"], day_number, int(row["period_no"])))
-        if timetable is None or timetable.subject_id != subject_ids[row["subject"]] \
-                or timetable.faculty_id != user_ids[row["faculty_email"].strip().lower()]:
+        existing_timetable = timetable_by_slot.get(
+            (row["section"], day_number, int(row["period_no"]))
+        )
+        if (
+            existing_timetable is None
+            or existing_timetable.subject_id != subject_ids[row["subject"]]
+            or existing_timetable.faculty_id != user_ids[row["faculty_email"].strip().lower()]
+        ):
             raise ValueError("Absence %s does not match the weekly timetable." % row["id"])
         absence = Absence(
-            timetable_id=timetable.id,
+            timetable_id=existing_timetable.id,
             faculty_id=user_ids[row["faculty_email"].strip().lower()],
             date=absent_date,
             period_no=int(row["period_no"]),
@@ -155,7 +160,7 @@ def load_seed(session: Session, seed_dir: Path = SEED_DIR) -> dict[str, int]:
         session.add(absence)
         session.flush()
         absence_ids[row["id"]] = absence.id
-        absence_timetables[row["id"]] = timetable
+        absence_timetables[row["id"]] = existing_timetable
 
     for row in read_csv(seed_dir, "substitutions.csv"):
         timetable = absence_timetables[row["absence_id"]]

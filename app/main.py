@@ -1,5 +1,6 @@
 import secrets
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -29,7 +30,7 @@ from app.routes.substitution import router as substitution_router
 configure_logging(settings.log_level)
 
 
-def api_docs_urls(environment: str) -> dict[str, str | None]:
+def api_docs_urls(environment: str) -> dict[str, Any]:
     if environment == "production":
         return {"docs_url": None, "redoc_url": None, "openapi_url": None}
     return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}

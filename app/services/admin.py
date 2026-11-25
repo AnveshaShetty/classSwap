@@ -99,11 +99,14 @@ def _audit(session: Session, actor: User, action: str, target: str) -> None:
 
 
 def read_admin_chain(session: Session, department: str) -> list[tuple[AdminChain, User]]:
-    entries = list(session.execute(
+    entries = [
+        (chain_entry, user)
+        for chain_entry, user in session.execute(
         select(AdminChain, User)
         .join(User, User.id == AdminChain.user_id)
         .where(AdminChain.department == department)
-    ))
+        )
+    ]
     entries.sort(key=lambda entry: _position_order(entry[0].position))
     return entries
 

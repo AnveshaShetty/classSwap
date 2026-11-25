@@ -1,0 +1,21 @@
+rules:
+  - id: jinja-unsafe-safe-filter
+    languages:
+      - generic
+    paths:
+      include:
+        - "**/*.html"
+    message: Avoid Jinja's safe filter unless the value is explicitly trusted and reviewed.
+    severity: ERROR
+    pattern-regex: "\\|\\s*safe\\b"
+  - id: python-markup-escape-bypass
+    languages:
+      - python
+    paths:
+      include:
+        - "**/app/**/*.py"
+    message: Avoid Markup for user-controlled content; use normal template autoescaping.
+    severity: ERROR
+    pattern-either:
+      - pattern: Markup(...)
+      - pattern: markupsafe.Markup(...)

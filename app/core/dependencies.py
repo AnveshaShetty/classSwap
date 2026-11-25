@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.security import create_access_token, decode_access_token
-from app.core.authorization import can_act_as_admin, can_edit_admin_chain, can_import_timetable
+from app.core.authorization import can_act_as_admin
 from app.core.totp import decrypt_totp_secret, hash_backup_code, verify_totp
 from app.database import get_db
 from app.models import TotpBackupCode, User

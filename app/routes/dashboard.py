@@ -3,13 +3,12 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, StreamingResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_acting_admin
 from app.core.templating import templates
 from app.database import get_db
-from app.models import AdminChain, User
+from app.models import User
 from app.services.admin import AdminNotFound, get_acting_admin
 from app.services.dashboard import build_dashboard_data
 from app.services.reports import build_monthly_report, render_monthly_csv

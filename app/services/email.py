@@ -37,6 +37,6 @@ def dispatch_password_reset_email(recipient: str, token: str) -> None:
         send_password_reset_email(recipient, token)
     except (OSError, smtplib.SMTPException) as error:
         logger.error(
-            "Password reset email delivery failed (%s).",
+            "Reset notification delivery failed (error type: %s).",
             type(error).__name__,
         )

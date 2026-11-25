@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta, timezone
 import secrets
+from datetime import datetime, timedelta, timezone
+from typing import TypedDict, cast
 
 import jwt
 from passlib.context import CryptContext
@@ -19,6 +20,16 @@ password_context = CryptContext(
 dummy_password_hash = password_context.hash(secrets.token_urlsafe(32))
 ABSOLUTE_SESSION_LIFETIME = timedelta(hours=8)
 SLIDING_REFRESH_WINDOW = timedelta(minutes=10)
+
+
+class AccessTokenClaims(TypedDict):
+    sub: str
+    iat: int
+    exp: int
+    jti: str
+    ver: int
+    abs_exp: int
+    session_started: int
 
 
 def hash_password(password: str) -> str:
@@ -60,7 +71,7 @@ def create_access_token(
     return jwt.encode(claims, settings.jwt_secret_key, algorithm="HS256")
 
 
-def decode_access_token(token: str) -> dict[str, object] | None:
+def decode_access_token(token: str) -> AccessTokenClaims | None:
     try:
         claims = jwt.decode(
             token,
@@ -85,6 +96,8 @@ def decode_access_token(token: str) -> dict[str, object] | None:
     if (
         not isinstance(subject, str)
         or not subject.isdecimal()
+        or not isinstance(claims.get("iat"), int)
+        or not isinstance(claims.get("exp"), int)
         or not isinstance(claims.get("jti"), str)
         or not isinstance(claims.get("ver"), int)
         or not isinstance(claims.get("abs_exp"), int)
@@ -93,7 +106,7 @@ def decode_access_token(token: str) -> dict[str, object] | None:
         return None
     if datetime.now(timezone.utc).timestamp() >= claims["abs_exp"]:
         return None
-    return claims
+    return cast(AccessTokenClaims, claims)
 
 
 def get_token_user_id(token: str) -> int | None:

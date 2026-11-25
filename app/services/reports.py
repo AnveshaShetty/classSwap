@@ -91,7 +91,7 @@ def build_monthly_report(
     total = len(rows)
     covered = sum(row["status"] == "accepted" for row in rows)
     pending = sum(row["status"] == "pending" for row in rows)
-    fairness = []
+    fairness: list[dict[str, Any]] = []
     if substitute_ids:
         for person in session.scalars(
             select(User).where(User.id.in_(substitute_ids)).order_by(User.name)
