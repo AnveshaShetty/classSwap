@@ -15,6 +15,10 @@ def can_access_department(actor: User, department: str) -> bool:
     return actor.role == "super_admin" or actor.department == department
 
 
+def can_request_substitution(actor_id: int, absence: Absence) -> bool:
+    return actor_id == absence.faculty_id
+
+
 def can_respond_to_substitution(actor_id: int, substitution: Substitution) -> bool:
     return actor_id == substitution.substitute_id
 

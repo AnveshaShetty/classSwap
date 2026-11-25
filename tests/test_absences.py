@@ -245,6 +245,34 @@ def test_substitution_response_is_hidden_from_non_candidate(
     assert hidden.status_code == unknown.status_code == 404
 
 
+def test_faculty_cannot_create_substitution_for_another_facultys_absence(
+    absence_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, owner = absence_context
+    created = client.post(
+        "/absences",
+        json={"date": "2026-11-30", "periods": [3], "reason": "Private absence"},
+    )
+    absence_id = created.json()[0]["id"]
+    candidate_id = client.get(f"/absences/{absence_id}/suggestions").json()[0]["faculty_id"]
+
+    with Session(test_engine) as session:
+        other = session.scalar(
+            select(User).where(User.id != owner.id, User.role == "faculty").limit(1)
+        )
+        assert other is not None
+        other_user = _copy_user(session, other.id)
+    app.dependency_overrides[get_current_user] = lambda: other_user
+
+    response = client.post(
+        "/substitutions",
+        json={"absence_id": absence_id, "substitute_id": candidate_id},
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 404
+
+
 def test_candidate_pending_request_limit_is_enforced(
     absence_context: tuple[TestClient, Engine, User],
 ) -> None:

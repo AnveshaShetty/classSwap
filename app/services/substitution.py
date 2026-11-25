@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import append_audit
-from app.core.authorization import can_respond_to_substitution
+from app.core.authorization import can_request_substitution, can_respond_to_substitution
 from app.models import Absence, Room, Section, Subject, Substitution, Timetable, User
 from app.services.suggestion import Suggestion, suggest_candidates
 
@@ -97,7 +97,7 @@ def _create_request(
     enforce_owner: bool = True,
 ) -> Substitution:
     absence = _get_absence(session, absence_id, lock=True)
-    if enforce_owner and absence.faculty_id != requester_id:
+    if enforce_owner and not can_request_substitution(requester_id, absence):
         raise SubstitutionNotFound("Absence not found.")
     already_covered = session.scalar(
         select(Substitution.id).where(

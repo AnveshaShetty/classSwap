@@ -1,11 +1,16 @@
 from fastapi.routing import APIRoute
 from starlette.routing import Mount, Route
 
-from app.core.authorization import can_act_as_admin, can_edit_admin_chain, can_import_timetable
+from app.core.authorization import (
+    can_act_as_admin,
+    can_edit_admin_chain,
+    can_import_timetable,
+    can_request_substitution,
+)
 from app.core.csrf import require_csrf
 from app.core.dependencies import get_current_user
 from app.main import app
-from app.models import User
+from app.models import Absence, User
 
 
 def _http_routes(routes: list[object]) -> list[object]:
@@ -84,3 +89,10 @@ def test_acting_admin_permissions_are_allowlisted() -> None:
     assert not can_import_timetable(hod)
     assert can_edit_admin_chain(super_admin)
     assert not can_edit_admin_chain(hod)
+
+
+def test_only_absence_owner_can_request_a_substitute() -> None:
+    absence = Absence(id=10, faculty_id=7)
+
+    assert can_request_substitution(7, absence)
+    assert not can_request_substitution(8, absence)
