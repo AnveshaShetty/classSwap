@@ -4,3 +4,15 @@
 __pycache__
 .pytest_cache
 *.pyc
+.env.*
+venv
+*.db
+*.sqlite3
+.coverage
+htmlcov
+tests
+seed
+data
+requirements.in
+requirements-dev.in
+requirements-dev.txt

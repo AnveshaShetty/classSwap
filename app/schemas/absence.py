@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AbsenceCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     date: date
     periods: list[int] = Field(min_length=1, max_length=7)
     reason: str = Field(min_length=1, max_length=255)

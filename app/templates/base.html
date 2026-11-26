@@ -7,12 +7,9 @@
   <title>{% block title %}ClassSwap{% endblock %}</title>
   <meta name="theme-color" content="#183541">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <style>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous"></script>
+  <style nonce="{{ request.state.csp_nonce }}">
     :root {
       color-scheme: light;
       --ink: #172a35;
@@ -36,7 +33,7 @@
       margin: 0;
       background: var(--canvas);
       color: var(--ink);
-      font: 15px/1.5 "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     a { color: inherit; text-decoration: none; }
@@ -113,7 +110,20 @@
     }
     .user-name { color: #f1f5f3; font-size: 12px; font-weight: 650; }
     .user-role { color: #9db1b4; display: block; font-size: 10px; text-transform: capitalize; }
-    .logout-link { color: #aec2c3; display: block; font-size: 12px; padding: 8px; }
+    .logout-link {
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      color: #aec2c3;
+      display: block;
+      font-size: 12px;
+      padding: 8px;
+      text-align: left;
+      transition: background .16s ease, color .16s ease;
+      width: 100%;
+    }
+    .logout-link:hover { background: rgba(226, 242, 235, .12); color: #fff; }
+    .logout-link:focus-visible { outline: 2px solid #d7eee3; outline-offset: 2px; }
     .main-shell { margin-left: 248px; min-height: 100vh; }
     .topbar {
       align-items: center;
@@ -218,6 +228,27 @@
     .chart-day { align-items: center; color: #8a979c; display: flex; flex-direction: column; font-size: 10px; gap: 7px; height: 100%; justify-content: end; }
     .chart-track { align-items: end; background: #f0f4f1; border-radius: 6px 6px 3px 3px; display: flex; height: 95px; justify-content: center; overflow: hidden; width: 100%; }
     .chart-bar { background: #65a78b; border-radius: 6px 6px 2px 2px; min-height: 0; width: 100%; }
+    .chart-bar-0 { height: 0%; }
+    .chart-bar-5 { height: 5%; }
+    .chart-bar-10 { height: 10%; }
+    .chart-bar-15 { height: 15%; }
+    .chart-bar-20 { height: 20%; }
+    .chart-bar-25 { height: 25%; }
+    .chart-bar-30 { height: 30%; }
+    .chart-bar-35 { height: 35%; }
+    .chart-bar-40 { height: 40%; }
+    .chart-bar-45 { height: 45%; }
+    .chart-bar-50 { height: 50%; }
+    .chart-bar-55 { height: 55%; }
+    .chart-bar-60 { height: 60%; }
+    .chart-bar-65 { height: 65%; }
+    .chart-bar-70 { height: 70%; }
+    .chart-bar-75 { height: 75%; }
+    .chart-bar-80 { height: 80%; }
+    .chart-bar-85 { height: 85%; }
+    .chart-bar-90 { height: 90%; }
+    .chart-bar-95 { height: 95%; }
+    .chart-bar-100 { height: 100%; }
     .chart-count { color: #5c6e73; font-size: 10px; font-weight: 700; }
     .inline-link { color: var(--green); font-size: 11px; font-weight: 730; }
     .inline-link:hover { text-decoration: underline; }
@@ -263,6 +294,25 @@
     .period-option { align-items: center; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; display: flex; font-size: 12px; gap: 7px; padding: 9px; }
     .period-option input { accent-color: var(--green); min-height: auto; width: auto; }
     .table-status { color: #66777c; font-size: 11px; }
+    .max-width-720 { max-width: 720px; }
+    .fieldset-reset { border: 0; margin: 0; padding: 0; }
+    .legend-spacing { margin-bottom: 8px; }
+    .button-start { align-self: start; }
+    .panel-spacing { margin-bottom: 18px; }
+    .table-wide { min-width: 920px; }
+    .timetable-cell { min-width: 125px; vertical-align: top; }
+    .timetable-entry { background: #f7faf8; border: 1px solid #e8efeb; border-radius: 9px; margin-bottom: 5px; padding: 8px; }
+    .timetable-subject, .timetable-room { display: block; }
+    .timetable-subject { font-size: 11px; }
+    .substitute-status { margin-top: 6px; }
+    .blank-cell { background: #fafbfa; }
+    .description-spacing { margin-top: 12px; }
+    .reason-text { display: block; }
+    .subtitle-spacing { margin-bottom: 24px; }
+    .button-full { width: 100%; }
+    .request-heading { align-items: flex-start; display: flex; justify-content: space-between; gap: 12px; }
+    .eyebrow-tight { margin-bottom: 5px; }
+    .subtitle-top-spacing { margin-top: 10px; }
     @media (max-width: 1000px) {
       .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
       .metric-card { border-bottom: 1px solid var(--line); }
@@ -298,7 +348,7 @@
   </style>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body hx-headers='{"X-CSRF-Token": "{{ request.cookies.get("__Host-classswap_csrf", "") }}"}'>
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <div class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Loading">
     <div class="loading-content"><span class="loading-mark" aria-hidden="true"></span><span>Preparing this view…</span><span class="loading-line" aria-hidden="true"></span></div>
@@ -323,7 +373,10 @@
           <span class="avatar" aria-hidden="true">{{ current_user.name.split()|map('first')|join|upper|truncate(2, true, '') }}</span>
           <span class="user-name">{{ current_user.name }}<span class="user-role">{{ current_user.role.replace('_', ' ') }}</span></span>
         </div>
-        <a class="logout-link" href="/logout">Sign out</a>
+        <form action="/auth/logout" method="post">
+          <input type="hidden" name="csrf_token" value="{{ request.cookies.get('__Host-classswap_csrf', '') }}">
+          <button class="logout-link" type="submit">Sign out</button>
+        </form>
       </div>
     </aside>
     {% endif %}
@@ -337,7 +390,12 @@
       {% block body %}<main class="content" id="main-content">{% block content %}{% endblock %}</main>{% endblock %}
     </div>
   </div>
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
+    window.classSwapCsrfToken = () => {
+      const prefix = "__Host-classswap_csrf=";
+      const cookie = document.cookie.split("; ").find((item) => item.startsWith(prefix));
+      return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
+    };
     if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.8 } });
     document.addEventListener("htmx:beforeRequest", () => document.getElementById("loading-screen")?.classList.add("visible"));
     document.addEventListener("htmx:afterRequest", () => document.getElementById("loading-screen")?.classList.remove("visible"));

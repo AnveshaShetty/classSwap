@@ -10,7 +10,7 @@
 <section id="suggestion-list" class="card-list" aria-live="polite">
   <div class="panel empty-state"><span class="empty-icon" aria-hidden="true">↻</span><div class="empty-title">Finding eligible faculty…</div></div>
 </section>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   const absenceId = {{ absence.id }};
   const list = document.getElementById("suggestion-list");
   const message = document.getElementById("suggestion-message");
@@ -45,7 +45,10 @@
       try {
         const response = await fetch("/substitutions", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": window.classSwapCsrfToken()
+          },
           credentials: "same-origin",
           body: JSON.stringify({ absence_id: absenceId, substitute_id: candidate.faculty_id })
         });

@@ -91,7 +91,7 @@ def build_monthly_report(
     total = len(rows)
     covered = sum(row["status"] == "accepted" for row in rows)
     pending = sum(row["status"] == "pending" for row in rows)
-    fairness = []
+    fairness: list[dict[str, Any]] = []
     if substitute_ids:
         for person in session.scalars(
             select(User).where(User.id.in_(substitute_ids)).order_by(User.name)
@@ -132,6 +132,8 @@ def render_monthly_csv(report: dict[str, Any]) -> str:
 
 
 def _spreadsheet_safe(value: str) -> str:
-    if value.startswith(("=", "+", "-", "@")):
+    if value.startswith(("=", "+", "-", "@", "\t", "\r", "\n")) or value.lstrip(
+        " \t\r\n"
+    ).startswith(("=", "+", "-", "@")):
         return "'" + value
     return value

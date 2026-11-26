@@ -2,7 +2,7 @@
   <span class="status {% if response_status == 'accepted' %}accepted{% else %}declined{% endif %}">
     {{ response_status }}
   </span>
-  <p class="subtitle" style="margin-top: 10px">
+  <p class="subtitle subtitle-top-spacing">
     {% if response_status == "accepted" %}
     You accepted this class. Thank you for covering it.
     {% elif next_request %}

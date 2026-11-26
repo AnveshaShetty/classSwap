@@ -1,7 +1,10 @@
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 
 import pytest
+import pyotp
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import Engine
@@ -9,14 +12,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from app.config import settings
+from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
 from app.main import app
-from app.models import Room, Section, Timetable, User
+from app.models import Leave, Room, Section, Timetable, User
 from scripts.seed import load_seed
+from app.services.timetable import MAX_UPLOAD_BYTES
+from tests.conftest import configure_csrf_client
 
 
 @pytest.fixture
-def timetable_context() -> Iterator[tuple[TestClient, Engine]]:
+def timetable_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, Engine]]:
     test_engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -31,18 +40,30 @@ def timetable_context() -> Iterator[tuple[TestClient, Engine]]:
         with Session(test_engine) as session:
             yield session
 
-    hod = User(
-        id=1,
-        name="Demo HOD",
-        email="meera.shenoy@demo.edu",
-        password_hash="",
-        role="hod",
-        department="Computer Science and Design",
-        teaches=True,
-    )
+    secret = pyotp.random_base32()
+    monkeypatch.setattr(settings, "totp_encryption_key", Fernet.generate_key().decode("ascii"))
+    with Session(test_engine) as session:
+        admin_row = session.scalar(select(User).where(User.role == "super_admin"))
+        assert admin_row is not None
+        admin_row.totp_secret_encrypted = encrypt_totp_secret(secret)
+        admin_row.totp_enabled = True
+        admin = User(
+            id=admin_row.id,
+            name=admin_row.name,
+            email=admin_row.email,
+            password_hash=admin_row.password_hash,
+            role=admin_row.role,
+            department=admin_row.department,
+            teaches=admin_row.teaches,
+            totp_secret_encrypted=admin_row.totp_secret_encrypted,
+            totp_enabled=True,
+        )
+        session.commit()
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_current_user] = lambda: hod
-    with TestClient(app) as client:
+    app.dependency_overrides[get_current_user] = lambda: admin
+    with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
+        client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
         yield client, test_engine
     app.dependency_overrides.clear()
     test_engine.dispose()
@@ -68,13 +89,82 @@ def test_invalid_csv_reports_row_and_imports_nothing(timetable_context: tuple[Te
         assert session.scalar(select(func.count()).select_from(Timetable)) == 119
 
 
+def test_import_rejects_oversized_csv_without_importing_rows(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("large.csv", b"x" * (MAX_UPLOAD_BYTES + 1), "text/csv")},
+    )
+
+    assert response.status_code == 413
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Timetable)) == 119
+
+
+def test_import_rejects_more_than_5000_rows_without_importing(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+    content = (
+        b"section,day,period,subject,faculty_email,room\n"
+        + b"Missing,Mon,1,Subject,teacher@example.edu,Room\n" * 5001
+    )
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("large.csv", content, "text/csv")},
+    )
+
+    assert response.status_code == 422
+    assert "5,000 rows" in response.json()["detail"]["errors"][0]["message"]
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Timetable)) == 119
+
+
+def test_import_requires_csv_filename_and_content_type(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, _ = timetable_context
+
+    bad_extension = client.post(
+        "/timetable/import",
+        files={"file": ("timetable.txt", b"data", "text/csv")},
+    )
+    bad_content_type = client.post(
+        "/timetable/import",
+        files={"file": ("timetable.csv", b"data", "application/octet-stream")},
+    )
+
+    assert bad_extension.status_code == 415
+    assert bad_content_type.status_code == 415
+
+
+def test_import_rejects_non_utf8_csv_without_importing_rows(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("invalid.csv", b"\xff\xfe\x00", "text/csv")},
+    )
+
+    assert response.status_code == 422
+    assert "UTF-8" in response.json()["detail"]["errors"][0]["message"]
+    with Session(test_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Timetable)) == 119
+
+
 def test_valid_csv_import_preserves_absence_history(timetable_context: tuple[TestClient, Engine]) -> None:
     client, test_engine = timetable_context
     csv_path = Path(__file__).resolve().parents[1] / "seed" / "timetable.csv"
     app.dependency_overrides.pop(get_current_user)
     login_response = client.post(
         "/auth/login",
-        json={"email": "meera.shenoy@demo.edu", "password": "demo123"},
+        json={"email": "principal.demo@demo.edu", "password": "demo123"},
     )
     assert login_response.status_code == 200
 
@@ -138,6 +228,36 @@ def test_faculty_cannot_import_timetable(timetable_context: tuple[TestClient, En
         department="Computer Science and Design",
         teaches=True,
     )
+    csv_path = Path(__file__).resolve().parents[1] / "seed" / "timetable.csv"
+
+    response = client.post(
+        "/timetable/import",
+        files={"file": ("timetable.csv", csv_path.read_bytes(), "text/csv")},
+    )
+
+    assert response.status_code == 403
+
+
+def test_stand_in_admin_cannot_import_timetable(
+    timetable_context: tuple[TestClient, Engine],
+) -> None:
+    client, test_engine = timetable_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.email == "meera.shenoy@demo.edu"))
+        stand_in = session.scalar(select(User).where(User.email == "arjun.kulkarni@demo.edu"))
+        assert hod is not None and stand_in is not None
+        session.add(Leave(user_id=hod.id, date=date.today()))
+        acting_user = User(
+            id=stand_in.id,
+            name=stand_in.name,
+            email=stand_in.email,
+            password_hash=stand_in.password_hash,
+            role=stand_in.role,
+            department=stand_in.department,
+            teaches=stand_in.teaches,
+        )
+        session.commit()
+    app.dependency_overrides[get_current_user] = lambda: acting_user
     csv_path = Path(__file__).resolve().parents[1] / "seed" / "timetable.csv"
 
     response = client.post(

@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 __pycache__/
@@ -8,6 +10,11 @@ __pycache__/
 htmlcov/
 *.db
 *.sqlite3
+*.dump
+*.backup
+*.bak
+seed_credentials.*
+seed-credentials.*
 .idea/
 .vscode/
 Thumbs.db

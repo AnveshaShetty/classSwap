@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
+import pyotp
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.engine import Engine
@@ -9,6 +11,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.dependencies import get_current_user
+from tests.conftest import configure_csrf_client
+from app.config import settings
+from app.core.totp import encrypt_totp_secret
 from app.database import Base, get_db
 from app.main import app
 from app.models import Absence, Substitution, Timetable, User
@@ -45,16 +50,27 @@ def dashboard_context() -> Iterator[tuple[TestClient, Engine, User]]:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: current_user
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
         yield client, test_engine, current_user
     app.dependency_overrides.clear()
     test_engine.dispose()
 
 
-def _act_as_hod(test_engine: Engine) -> None:
+def _act_as_hod(
+    client: TestClient,
+    test_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     with Session(test_engine) as session:
         hod = session.scalar(select(User).where(User.role == "hod"))
         assert hod is not None
+        secret = pyotp.random_base32()
+        monkeypatch.setattr(
+            settings,
+            "totp_encryption_key",
+            Fernet.generate_key().decode("ascii"),
+        )
         current_user = User(
             id=hod.id,
             name=hod.name,
@@ -63,8 +79,11 @@ def _act_as_hod(test_engine: Engine) -> None:
             role=hod.role,
             department=hod.department,
             teaches=hod.teaches,
+            totp_secret_encrypted=encrypt_totp_secret(secret),
+            totp_enabled=True,
         )
     app.dependency_overrides[get_current_user] = lambda: current_user
+    client.headers["X-TOTP-Code"] = pyotp.TOTP(secret).now()
 
 
 def test_dashboard_api_and_page_use_stored_absence_data(
@@ -103,14 +122,53 @@ def test_dashboard_api_and_page_use_stored_absence_data(
     assert page.status_code == 200
     assert "Absence register" in page.text
     assert "Medical leave" in page.text
+    assert 'src="https://images.unsplash.com/' in page.text
+    assert "img-src 'self' data: https://images.unsplash.com;" in page.headers[
+        "content-security-policy"
+    ]
+    assert ".logout-link:hover" in page.text
+    assert "background: transparent;" in page.text
+
+
+def test_stored_user_content_is_html_escaped(
+    dashboard_context: tuple[TestClient, Engine, User],
+) -> None:
+    client, test_engine, current_user = dashboard_context
+    current_user.name = '<img src=x onerror="alert(1)">'
+    with Session(test_engine) as session:
+        timetable = session.scalar(
+            select(Timetable).where(
+                Timetable.faculty_id == current_user.id,
+                Timetable.day_of_week == 0,
+                Timetable.period_no == 3,
+            )
+        )
+        assert timetable is not None
+        session.add(Absence(
+            timetable_id=timetable.id,
+            faculty_id=current_user.id,
+            date=date(2026, 11, 30),
+            period_no=3,
+            reason='<script>alert("stored")</script>',
+        ))
+        session.commit()
+
+    response = client.get("/dashboard", params={"date": "2026-11-30"})
+
+    assert response.status_code == 200
+    assert '<img src=x onerror="alert(1)">' not in response.text
+    assert "&lt;img" in response.text
+    assert '<script>alert("stored")</script>' not in response.text
+    assert "&lt;script&gt;" in response.text
 
 
 def test_monthly_report_csv_contains_seeded_rows_and_statuses(
     dashboard_context: tuple[TestClient, Engine, User],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, test_engine, _ = dashboard_context
     assert client.get("/reports").status_code == 403
-    _act_as_hod(test_engine)
+    _act_as_hod(client, test_engine, monkeypatch)
 
     response = client.get("/reports/monthly", params={"month": "2026-11"})
 
@@ -126,15 +184,71 @@ def test_monthly_report_csv_contains_seeded_rows_and_statuses(
     assert page.status_code == 200
     assert "Monthly report" in page.text
     assert "2026-11-02" in page.text
+    assert 'src="https://images.unsplash.com/' in page.text
+    assert "img-src 'self' data: https://images.unsplash.com;" in page.headers[
+        "content-security-policy"
+    ]
+
+
+def test_unenrolled_hod_is_guided_through_mfa_before_viewing_reports(
+    dashboard_context: tuple[TestClient, Engine, User],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, test_engine, _ = dashboard_context
+    with Session(test_engine) as session:
+        hod = session.scalar(select(User).where(User.role == "hod"))
+        assert hod is not None
+        current_user = User(
+            id=hod.id,
+            name=hod.name,
+            email=hod.email,
+            password_hash=hod.password_hash,
+            role=hod.role,
+            department=hod.department,
+            teaches=hod.teaches,
+            token_version=hod.token_version,
+        )
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    client.headers["Accept"] = "text/html"
+
+    response = client.get("/reports", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(
+        "/security/two-factor?next=%2Freports"
+    )
+    setup_page = client.get(response.headers["location"])
+    assert setup_page.status_code == 200
+    assert "Set up two-factor authentication" in setup_page.text
+
+    secret = pyotp.random_base32()
+    monkeypatch.setattr(
+        settings,
+        "totp_encryption_key",
+        Fernet.generate_key().decode("ascii"),
+    )
+    current_user.totp_secret_encrypted = encrypt_totp_secret(secret)
+    current_user.totp_enabled = True
+    verification = client.post(
+        "/auth/totp/verify",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+
+    assert verification.status_code == 200
+    assert client.cookies.get("__Host-classswap_mfa")
+    report = client.get("/reports")
+    assert report.status_code == 200
+    assert "Monthly report" in report.text
 
 
 @pytest.mark.parametrize("month", ["2026-13", "November 2026", "2026-2"])
 def test_monthly_report_rejects_invalid_month(
     dashboard_context: tuple[TestClient, Engine, User],
     month: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, test_engine, _ = dashboard_context
-    _act_as_hod(test_engine)
+    _act_as_hod(client, test_engine, monkeypatch)
 
     response = client.get("/reports/monthly", params={"month": month})
 

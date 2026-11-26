@@ -3,7 +3,16 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_acting_admin
+from app.core.audit import append_audit
+from app.core.authorization import can_access_department, can_edit_admin_chain
+from app.core.csrf import require_csrf
+from app.core.dependencies import (
+    get_current_user,
+    require_acting_admin,
+    require_admin_mfa,
+    require_policy,
+    require_roles,
+)
 from app.database import get_db
 from app.models import User
 from app.schemas.admin import (
@@ -17,6 +26,7 @@ from app.schemas.admin import (
 from app.services.admin import (
     AdminConflict,
     AdminNotFound,
+    anonymize_user,
     cancel_whole_day_leave,
     create_whole_day_leave,
     get_acting_admin,
@@ -25,7 +35,7 @@ from app.services.admin import (
 )
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 @router.get("/admin/acting", response_model=ActingAdminRead)
@@ -35,6 +45,8 @@ def read_acting_admin(
     session: Session = Depends(get_db),
 ) -> ActingAdminRead:
     target_department = department or current_user.department
+    if not can_access_department(current_user, target_department):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Acting administrator not found.")
     try:
         user, position = get_acting_admin(session, target_department, date.today())
     except AdminNotFound as error:
@@ -48,6 +60,36 @@ def read_acting_admin(
     )
 
 
+@router.post("/admin/users/{user_id}/force-logout", status_code=status.HTTP_204_NO_CONTENT)
+def force_logout_user(
+    user_id: int,
+    actor: User = Depends(require_roles("super_admin")),
+    _: User = Depends(require_admin_mfa),
+    session: Session = Depends(get_db),
+) -> None:
+    target = session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    target.token_version += 1
+    append_audit(session, actor, "user.force_logout", "user:%d" % target.id)
+    session.commit()
+
+
+@router.post("/admin/users/{user_id}/anonymize", status_code=status.HTTP_204_NO_CONTENT)
+def anonymize_user_data(
+    user_id: int,
+    actor: User = Depends(require_roles("super_admin")),
+    _: User = Depends(require_admin_mfa),
+    session: Session = Depends(get_db),
+) -> None:
+    try:
+        anonymize_user(session, actor, user_id)
+    except AdminNotFound as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.") from error
+    except AdminConflict as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+
 @router.get("/admin/chain", response_model=AdminChainRead)
 def get_admin_chain(
     current_user: User = Depends(require_acting_admin("chain")),
@@ -55,11 +97,8 @@ def get_admin_chain(
     session: Session = Depends(get_db),
 ) -> AdminChainRead:
     target_department = department or current_user.department
-    if current_user.role != "super_admin" and target_department != current_user.department:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your department's admin chain.",
-        )
+    if not can_access_department(current_user, target_department):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin chain not found.")
     entries = read_admin_chain(session, target_department)
     return AdminChainRead(
         department=target_department,
@@ -78,7 +117,8 @@ def get_admin_chain(
 @router.put("/admin/chain", response_model=AdminChainRead)
 def update_admin_chain(
     payload: AdminChainUpdate,
-    current_user: User = Depends(require_acting_admin("chain")),
+    current_user: User = Depends(require_policy(can_edit_admin_chain)),
+    _: User = Depends(require_admin_mfa),
     session: Session = Depends(get_db),
 ) -> AdminChainRead:
     try:

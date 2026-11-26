@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Iterable
 
 from sqlalchemy import func, select
@@ -232,16 +232,19 @@ def suggest_candidates(session: Session, absence_id: int) -> list[Suggestion]:
         ).distinct()
     ))
     first_day, following_month = _month_bounds(absence.date)
-    monthly_counts = dict(session.execute(
-        select(Substitution.substitute_id, func.count(Substitution.id))
-        .where(
-            Substitution.substitute_id.in_(eligible_ids),
-            Substitution.status == "accepted",
-            Substitution.date >= first_day,
-            Substitution.date < following_month,
-        )
-        .group_by(Substitution.substitute_id)
-    ).all())
+    monthly_counts: dict[int, int] = {
+        faculty_id: int(count)
+        for faculty_id, count in session.execute(
+            select(Substitution.substitute_id, func.count(Substitution.id))
+            .where(
+                Substitution.substitute_id.in_(eligible_ids),
+                Substitution.status == "accepted",
+                Substitution.date >= first_day,
+                Substitution.date < following_month,
+            )
+            .group_by(Substitution.substitute_id)
+        ).all()
+    }
 
     busy_periods: dict[int, set[int]] = {faculty_id: set() for faculty_id in eligible_ids}
     for faculty_id, period in busy_timetable:

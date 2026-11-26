@@ -1,0 +1,43 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: python -m ruff check app scripts migrations tests data
+        language: system
+        pass_filenames: false
+      - id: mypy
+        name: mypy
+        entry: python -m mypy app scripts
+        language: system
+        pass_filenames: false
+      - id: bandit
+        name: bandit
+        entry: python -m bandit -q -r app scripts migrations data --severity-level high
+        language: system
+        pass_filenames: false
+      - id: pip-audit-runtime
+        name: pip-audit runtime
+        entry: python -m pip_audit -r requirements.txt
+        language: system
+        pass_filenames: false
+      - id: pip-audit-development
+        name: pip-audit development
+        entry: python -m pip_audit -r requirements-dev.txt
+        language: system
+        pass_filenames: false
+      - id: pip-audit-data
+        name: pip-audit data
+        entry: python -m pip_audit -r data/requirements.txt
+        language: system
+        pass_filenames: false
+      - id: semgrep
+        name: semgrep
+        entry: semgrep/semgrep:1.186.0@sha256:6e1b04340e60e910fbb4ddbf3c857ab0918f064417ad5ac530014ccb3cf8c8f1 semgrep scan --config p/python --config p/fastapi --config p/security-audit --config /src/.semgrep/jinja.yml --error /src/app
+        language: docker_image
+        pass_filenames: false
+      - id: gitleaks
+        name: gitleaks
+        entry: zricethezav/gitleaks:v8.29.0@sha256:71d3ee5990f2176f763b438298453fc37e87b119122045e176ca9d44ff00b08b git --staged --redact
+        language: docker_image
+        pass_filenames: false

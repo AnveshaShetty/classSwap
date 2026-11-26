@@ -1,14 +1,16 @@
 from datetime import date
-from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.core.authorization import can_access_absence
 from app.config import settings
-from app.core.dependencies import get_current_user
+from app.core.csrf import require_csrf
+from app.core.dependencies import get_current_user, require_roles
+from app.core.templating import templates
 from app.database import get_db
 from app.models import Section, Subject, Timetable, User
 from app.services.absence import AbsenceNotFound, get_absence
@@ -22,8 +24,7 @@ from app.services.substitution import (
 )
 
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 def _can_view_reports(session: Session, current_user: User) -> bool:
@@ -36,12 +37,12 @@ def _can_view_reports(session: Session, current_user: User) -> bool:
     return acting_admin.id == current_user.id
 
 
-@router.get("/", include_in_schema=False)
+@router.get("/", include_in_schema=False, openapi_extra={"x-auth-policy": "public"})
 def home() -> RedirectResponse:
     return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.get("/login", response_class=HTMLResponse)
+@router.get("/login", response_class=HTMLResponse, openapi_extra={"x-auth-policy": "public"})
 def login_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
@@ -50,11 +51,43 @@ def login_page(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/logout", include_in_schema=False)
-def logout() -> RedirectResponse:
-    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie(settings.auth_cookie_name, path="/")
-    return response
+@router.get("/reset-password", response_class=HTMLResponse, openapi_extra={"x-auth-policy": "public"})
+def reset_password_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="reset_password.html",
+        context={"request": request},
+    )
+
+
+@router.get("/security/two-factor", response_class=HTMLResponse)
+def two_factor_page(
+    request: Request,
+    next_url: str = Query(default="/dashboard", alias="next"),
+    current_user: User = Depends(require_roles("hod", "super_admin")),
+    session: Session = Depends(get_db),
+) -> HTMLResponse:
+    parsed_next = urlsplit(next_url)
+    if (
+        parsed_next.scheme
+        or parsed_next.netloc
+        or not parsed_next.path.startswith("/")
+        or parsed_next.path.startswith("//")
+        or "\\" in next_url
+    ):
+        next_url = "/dashboard"
+    return templates.TemplateResponse(
+        request=request,
+        name="two_factor.html",
+        context={
+            "request": request,
+            "current_user": current_user,
+            "today": date.today().isoformat(),
+            "can_view_reports": _can_view_reports(session, current_user),
+            "totp_enabled": current_user.totp_enabled,
+            "redirect_to": next_url,
+        },
+    )
 
 
 @router.get("/absence/new", response_class=HTMLResponse)
@@ -145,6 +178,9 @@ def suggestions_page(
         absence = get_absence(session, absence_id)
     except AbsenceNotFound as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    owner = session.get(User, absence.faculty_id)
+    if not can_access_absence(current_user, absence, owner):
+        raise HTTPException(status_code=404, detail="Absence not found.")
     timetable = session.get(Timetable, absence.timetable_id)
     section = session.get(Section, timetable.section_id) if timetable is not None else None
     subject = session.get(Subject, timetable.subject_id) if timetable is not None else None

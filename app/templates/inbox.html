@@ -9,9 +9,9 @@
 <section id="request-list" class="card-list">
   {% for item in items %}
   <article class="request-card" id="request-{{ item.substitution.id }}">
-    <div style="align-items: flex-start; display: flex; justify-content: space-between; gap: 12px">
+    <div class="request-heading">
       <div>
-        <p class="eyebrow" style="margin-bottom: 5px">{{ item.substitution.date }} · Period {{ item.substitution.period_no }}</p>
+        <p class="eyebrow eyebrow-tight">{{ item.substitution.date }} · Period {{ item.substitution.period_no }}</p>
         <h2>{{ item.subject }}</h2>
         <p class="subtitle">{{ item.section }} · requested by {{ item.absent_faculty }}</p>
       </div>

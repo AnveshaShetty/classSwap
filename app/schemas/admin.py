@@ -1,14 +1,18 @@
 from datetime import date
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class AdminChainEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     position: str = Field(min_length=1, max_length=80)
     email: EmailStr
 
 
 class AdminChainUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     department: str = Field(min_length=1, max_length=120)
     entries: list[AdminChainEntry]
 
@@ -32,6 +36,8 @@ class ActingAdminRead(BaseModel):
 
 
 class LeaveCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     date: date
     reason: str = Field(default="Whole-day leave", min_length=1, max_length=255)
 

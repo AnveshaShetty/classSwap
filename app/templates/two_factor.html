@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Two-factor verification · ClassSwap{% endblock %}
+{% block breadcrumb %}Account security{% endblock %}
+{% block content %}
+<section class="page-heading" aria-labelledby="two-factor-title">
+  <div>
+    <p class="eyebrow">Admin security</p>
+    <h1 id="two-factor-title">{% if totp_enabled %}Verify your identity{% else %}Set up two-factor authentication{% endif %}</h1>
+    <p class="subtitle">Reports and other admin features require a code from your authenticator app.</p>
+  </div>
+</section>
+<section class="panel" aria-describedby="two-factor-description">
+  {% if totp_enabled %}
+  <p id="two-factor-description">Enter the current six-digit code from your authenticator app. You can also use one of your unused backup codes.</p>
+  {% else %}
+  <p id="two-factor-description">Add an authenticator app to your account to continue. Your secret is shown only during setup.</p>
+  <button class="button" id="start-setup" type="button">Start setup</button>
+  <div id="setup-details" hidden>
+    <ol>
+      <li>In your authenticator app, add a new account named <strong>ClassSwap</strong>.</li>
+      <li>Enter this secret key, or import the setup URI below.</li>
+      <li>Enter the six-digit code from the app to verify setup.</li>
+    </ol>
+    <p><strong>Secret key:</strong> <code id="totp-secret"></code></p>
+    <label class="field" for="provisioning-uri">Authenticator setup URI
+      <textarea id="provisioning-uri" rows="3" readonly></textarea>
+    </label>
+  </div>
+  {% endif %}
+  <form id="verification-form" class="form-grid" {% if not totp_enabled %}hidden{% endif %}>
+    <label class="field" for="totp-code">Authenticator or backup code
+      <input id="totp-code" name="code" type="text" inputmode="text" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" minlength="6" maxlength="64" required>
+    </label>
+    <div id="two-factor-message" class="notice error" role="alert" hidden></div>
+    <button class="button" type="submit">{% if totp_enabled %}Verify and continue{% else %}Enable and continue{% endif %}</button>
+  </form>
+  <section id="backup-codes" aria-labelledby="backup-codes-title" hidden>
+    <h2 id="backup-codes-title">Save your backup codes</h2>
+    <p>Each code works once. Store them somewhere private; they will not be shown again.</p>
+    <pre id="backup-code-list"></pre>
+    <button class="button" id="continue-button" type="button">Continue</button>
+  </section>
+</section>
+<script nonce="{{ request.state.csp_nonce }}">
+  const returnTo = {{ redirect_to|tojson }};
+  let totpEnabled = {{ totp_enabled|tojson }};
+  let setupStarted = totpEnabled;
+  let backupCodes = [];
+  const setupButton = document.getElementById("start-setup");
+  const setupDetails = document.getElementById("setup-details");
+  const verificationForm = document.getElementById("verification-form");
+  const message = document.getElementById("two-factor-message");
+
+  async function postJson(url, payload) {
+    const headers = { "X-CSRF-Token": window.classSwapCsrfToken() };
+    const options = { method: "POST", headers, credentials: "same-origin" };
+    if (payload !== undefined) {
+      headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(payload);
+    }
+    const response = await fetch(url, options);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "The request could not be completed.");
+    return data;
+  }
+
+  function showError(error) {
+    message.textContent = error.message || "The request could not be completed.";
+    message.hidden = false;
+  }
+
+  if (setupButton) {
+    setupButton.addEventListener("click", async () => {
+      setupButton.disabled = true;
+      message.hidden = true;
+      try {
+        const setup = await postJson("/auth/totp/setup");
+        document.getElementById("totp-secret").textContent = setup.secret;
+        document.getElementById("provisioning-uri").value = setup.provisioning_uri;
+        setupStarted = true;
+        setupDetails.hidden = false;
+        verificationForm.hidden = false;
+      } catch (error) {
+        showError(error);
+        setupButton.disabled = false;
+      }
+    });
+  }
+
+  verificationForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    message.hidden = true;
+    const code = document.getElementById("totp-code").value.trim();
+    try {
+      if (!totpEnabled) {
+        if (!setupStarted) throw new Error("Start two-factor setup first.");
+        const result = await postJson("/auth/totp/enable", { code });
+        backupCodes = result.backup_codes;
+        totpEnabled = true;
+      }
+      await postJson("/auth/totp/verify", { code });
+      if (backupCodes.length) {
+        document.getElementById("backup-code-list").textContent = backupCodes.join("\n");
+        document.getElementById("backup-codes").hidden = false;
+        verificationForm.hidden = true;
+        setupDetails.hidden = true;
+      } else {
+        window.location.assign(returnTo);
+      }
+    } catch (error) {
+      showError(error);
+    }
+  });
+
+  document.getElementById("continue-button").addEventListener("click", () => {
+    window.location.assign(returnTo);
+  });
+</script>
+{% endblock %}

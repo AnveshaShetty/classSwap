@@ -8,7 +8,7 @@
     <h1 id="error-title">That action didn’t finish.</h1>
     <p class="subtitle">{{ message|default("No update was confirmed. Try again, or return to the dashboard and check the latest status.") }}</p>
     <div class="request-actions">
-      <button class="button" type="button" onclick="location.reload()">Try again</button>
+      <a class="button" href="/login">Try again</a>
       <a class="button secondary" href="/dashboard">Open dashboard</a>
     </div>
   </section>

@@ -9,7 +9,7 @@
     </a>
     <p class="eyebrow">Faculty workspace</p>
     <h1 id="login-title">Sign in to ClassSwap</h1>
-    <p class="subtitle" style="margin-bottom: 24px">Open your timetable, coverage requests, and department updates.</p>
+    <p class="subtitle subtitle-spacing">Open your timetable, coverage requests, and department updates.</p>
     <form id="login-form" class="form-grid">
       <label class="field" for="email">College email
         <input id="email" name="email" type="email" autocomplete="username" required>
@@ -18,12 +18,12 @@
         <input id="password" name="password" type="password" autocomplete="current-password" required>
       </label>
       <div id="login-message" class="notice error" role="alert" hidden></div>
-      <button class="button" type="submit" style="width: 100%">Sign in</button>
+      <button class="button button-full" type="submit">Sign in</button>
     </form>
     <p class="footer">Your session is protected with an HTTP-only cookie.</p>
   </section>
 </main>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   document.getElementById("login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -32,7 +32,10 @@
     try {
       const response = await fetch("/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.classSwapCsrfToken()
+        },
         credentials: "same-origin",
         body: JSON.stringify({ email: form.email.value, password: form.password.value })
       });

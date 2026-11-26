@@ -1,15 +1,19 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SubstitutionCreate(BaseModel):
-    absence_id: int
-    substitute_id: int
+    model_config = ConfigDict(extra="forbid")
+
+    absence_id: int = Field(gt=0, strict=True)
+    substitute_id: int = Field(gt=0, strict=True)
 
 
 class SubstitutionRespond(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Literal["accepted", "declined"]
 
 

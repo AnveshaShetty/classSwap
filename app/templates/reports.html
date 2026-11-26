@@ -11,7 +11,7 @@
   <a class="button" href="/reports/monthly?month={{ month }}{% if department %}&department={{ department|urlencode }}{% endif %}">Download CSV</a>
 </header>
 
-<section class="panel" style="margin-bottom: 18px">
+<section class="panel panel-spacing">
   <form class="filter-bar" method="get" action="/reports">
     <label class="field" for="report-month">Reporting month
       <input id="report-month" type="month" name="month" value="{{ month }}" required>
@@ -30,7 +30,7 @@
   <article class="metric-card"><div class="metric-label">Uncovered</div><div class="metric-value">{{ uncovered }}</div><div class="metric-note">No accepted or pending request</div></article>
 </section>
 
-<section class="panel" style="margin-bottom: 18px">
+<section class="panel panel-spacing">
   <header class="panel-heading">
     <div><h2>Absence and coverage ledger</h2><p class="panel-description">One row per absence; a declined or expired offer is not counted as coverage.</p></div>
   </header>

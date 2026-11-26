@@ -1,16 +1,31 @@
+import csv
+from datetime import datetime, timezone
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
+import jwt
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+import pyotp
+from cryptography.fernet import Fernet
+from passlib.context import CryptContext
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.config import Settings, settings
 from app.core.dependencies import get_current_user, require_roles
+from tests.conftest import configure_csrf_client
 from app.database import Base, get_db
+from app.core.security import decode_access_token
 from app.main import app
-from app.models import User
+from app.models import PasswordResetToken, User
+from app.services.auth import (
+    authenticate_user,
+    consume_password_reset_token,
+    create_password_reset_token,
+)
 from scripts.seed import load_seed
 
 
@@ -31,7 +46,8 @@ def auth_client() -> Iterator[TestClient]:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
+        configure_csrf_client(client)
         yield client
     app.dependency_overrides.clear()
     test_engine.dispose()
@@ -47,14 +63,44 @@ def test_login_sets_http_only_cookie_and_me_returns_user(auth_client: TestClient
     assert response.json()["email"] == "ravi.kulal@demo.edu"
     assert "access_token" not in response.json()
     set_cookie = response.headers["set-cookie"].lower()
-    assert "classswap_access=" in set_cookie
+    assert f"{settings.auth_cookie_name.lower()}=" in set_cookie
     assert "httponly" in set_cookie
     assert "samesite=lax" in set_cookie
     assert auth_client.get("/me").json()["role"] == "faculty"
 
 
+def test_user_data_export_contains_only_safe_account_fields(auth_client: TestClient) -> None:
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    login_response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+    assert login_response.status_code == 200
+
+    response = auth_client.get("/me/export")
+    data = response.json()
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"].endswith("classswap-user-data.json\"")
+    assert data["user"]["email"] == "ravi.kulal@demo.edu"
+    assert "password_hash" not in response.text
+    assert "token_version" not in response.text
+    assert "totp_secret_encrypted" not in response.text
+    with (Path(__file__).parents[1] / "seed" / "faculty.csv").open(
+        "r",
+        newline="",
+        encoding="utf-8",
+    ) as faculty_csv:
+        other_emails = [
+            row["email"]
+            for row in csv.DictReader(faculty_csv)
+            if row["email"].lower() != "ravi.kulal@demo.edu"
+        ]
+    assert all(email not in response.text for email in other_emails)
+
+
 def test_invalid_credentials_and_missing_cookie_are_rejected(auth_client: TestClient) -> None:
-    auth_client.cookies.clear()
+    auth_client.cookies.delete(settings.auth_cookie_name)
     invalid_login = auth_client.post(
         "/auth/login",
         json={"email": "ravi.kulal@demo.edu", "password": "wrong"},
@@ -63,6 +109,408 @@ def test_invalid_credentials_and_missing_cookie_are_rejected(auth_client: TestCl
 
     assert invalid_login.status_code == 401
     assert unauthenticated.status_code == 401
+
+
+def test_failed_login_logs_never_include_password(auth_client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    secret = "must-never-appear-in-logs"
+
+    response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": secret},
+    )
+
+    assert response.status_code == 401
+    assert secret not in caplog.text
+
+
+def test_oversized_json_request_is_rejected(auth_client: TestClient) -> None:
+    body = b'{"email":"ravi@example.edu","password":"' + b"x" * (1024 * 1024) + b'"}'
+
+    response = auth_client.post(
+        "/auth/login",
+        content=body,
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Request body is too large."
+
+
+def test_validation_errors_do_not_echo_submitted_password(auth_client: TestClient) -> None:
+    password = "sensitive-value-" * 20
+
+    response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": password},
+    )
+
+    assert response.status_code == 422
+    assert password not in response.text
+
+
+def test_unknown_and_known_login_failures_have_same_response(auth_client: TestClient) -> None:
+    known = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "wrong"},
+    )
+    unknown = auth_client.post(
+        "/auth/login",
+        json={"email": "unknown@demo.edu", "password": "wrong"},
+    )
+
+    assert known.status_code == unknown.status_code == 401
+    assert known.json() == unknown.json()
+
+
+def test_legacy_bcrypt_hash_is_upgraded_after_successful_login() -> None:
+    test_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(test_engine)
+    legacy_hash = CryptContext(schemes=["bcrypt"]).hash("legacy-password")
+
+    with Session(test_engine) as session:
+        user = User(
+            name="Legacy User",
+            email="legacy@demo.edu",
+            password_hash=legacy_hash,
+            role="faculty",
+            department="Computer Science and Design",
+            teaches=True,
+        )
+        session.add(user)
+        session.commit()
+
+        assert authenticate_user(session, user.email, "legacy-password") is user
+        assert user.password_hash.startswith("$argon2id$")
+
+    test_engine.dispose()
+
+
+def test_login_is_locked_after_five_failures() -> None:
+    test_engine = create_engine("sqlite://")
+    Base.metadata.create_all(test_engine)
+    with Session(test_engine) as session:
+        user = User(
+            name="Lockout User",
+            email="lockout@demo.edu",
+            password_hash=CryptContext(schemes=["argon2"]).hash("correct-password"),
+            role="faculty",
+            department="Computer Science and Design",
+            teaches=True,
+        )
+        session.add(user)
+        session.commit()
+
+        for _ in range(5):
+            assert authenticate_user(
+                session,
+                user.email,
+                "incorrect-password",
+                "198.51.100.77",
+            ) is None
+        assert authenticate_user(
+            session,
+            user.email,
+            "correct-password",
+            "198.51.100.77",
+        ) is None
+    test_engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "password",
+    ["short", "password1234", "Ravi.Kulal$2026"],
+)
+def test_password_policy_rejects_weak_or_identifying_values(password: str) -> None:
+    from app.services.auth import validate_new_password
+
+    with pytest.raises(ValueError):
+        validate_new_password(password, "Ravi Kulal", "ravi.kulal@demo.edu")
+
+
+def test_login_cookie_is_secure_when_configured(auth_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "cookie_secure", True)
+    response = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+
+    assert response.status_code == 200
+    cookie = response.headers["set-cookie"].lower()
+    assert "__host-classswap_session=" in cookie
+    assert "secure" in cookie
+
+
+def test_logout_invalidates_previously_issued_token(auth_client: TestClient) -> None:
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    login = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+    old_token = auth_client.cookies.get(settings.auth_cookie_name)
+    assert login.status_code == 200 and old_token
+
+    logout_response = auth_client.post("/auth/logout")
+    auth_client.cookies.set(settings.auth_cookie_name, old_token)
+
+    assert logout_response.status_code == 204
+    assert auth_client.get("/me").status_code == 401
+
+
+def test_browser_logout_redirects_to_login(auth_client: TestClient) -> None:
+    auth_client.cookies.clear()
+    configure_csrf_client(auth_client)
+    login = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+    assert login.status_code == 200
+    assert auth_client.cookies.get(settings.auth_cookie_name)
+
+    logout_response = auth_client.post(
+        "/auth/logout",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+
+    assert logout_response.status_code == 303
+    assert logout_response.headers["location"] == "/login"
+    assert auth_client.cookies.get(settings.auth_cookie_name) is None
+    assert auth_client.get("/me").status_code == 401
+
+
+def test_password_change_invalidates_old_token(auth_client: TestClient) -> None:
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    login = auth_client.post(
+        "/auth/login",
+        json={"email": "ravi.kulal@demo.edu", "password": "demo123"},
+    )
+    old_token = auth_client.cookies.get(settings.auth_cookie_name)
+    assert login.status_code == 200 and old_token
+
+    change_response = auth_client.post(
+        "/auth/change-password",
+        json={
+            "current_password": "demo123",
+            "new_password": "SecureLongPassphrase2026!",
+        },
+    )
+    auth_client.cookies.set(settings.auth_cookie_name, old_token)
+
+    assert change_response.status_code == 204
+    assert auth_client.get("/me").status_code == 401
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    new_login = auth_client.post(
+        "/auth/login",
+        json={
+            "email": "ravi.kulal@demo.edu",
+            "password": "SecureLongPassphrase2026!",
+        },
+    )
+    assert new_login.status_code == 200
+
+
+def test_reset_token_is_hashed_single_use_and_expires() -> None:
+    test_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(test_engine)
+    with Session(test_engine) as session:
+        user = User(
+            name="Reset User",
+            email="one@demo.edu",
+            password_hash=CryptContext(schemes=["argon2"]).hash("old-password"),
+            role="faculty",
+            department="Computer Science and Design",
+            teaches=True,
+        )
+        session.add(user)
+        session.commit()
+
+        _, token = create_password_reset_token(session, user.email)
+        stored = session.scalar(
+            select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+        assert stored is not None
+        assert stored.token_hash != token
+        assert len(stored.token_hash) == 64
+        assert consume_password_reset_token(session, token, "SecureResetPassphrase2026!") is True
+        assert consume_password_reset_token(session, token, "AnotherSecurePassphrase2026!") is False
+
+        _, expired_token = create_password_reset_token(session, user.email)
+        expired = session.scalar(
+            select(PasswordResetToken)
+            .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+        )
+        assert expired is not None
+        expired.expires_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        session.commit()
+        assert consume_password_reset_token(
+            session,
+            expired_token,
+            "ExpiredResetPassphrase2026!",
+        ) is False
+    test_engine.dispose()
+
+
+def test_password_reset_request_does_not_disclose_email_existence(
+    auth_client: TestClient,
+) -> None:
+    known = auth_client.post(
+        "/auth/password-reset/request",
+        json={"email": "ravi.kulal@demo.edu"},
+    )
+    unknown = auth_client.post(
+        "/auth/password-reset/request",
+        json={"email": "unknown-reset@demo.edu"},
+    )
+
+    assert known.status_code == unknown.status_code == 202
+    assert known.json() == unknown.json()
+
+
+def test_admin_actions_require_totp_or_a_single_use_backup_code(
+    auth_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "totp_encryption_key",
+        Fernet.generate_key().decode("ascii"),
+    )
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    login = auth_client.post(
+        "/auth/login",
+        json={"email": "meera.shenoy@demo.edu", "password": "demo123"},
+    )
+    assert login.status_code == 200
+
+    setup = auth_client.post("/auth/totp/setup")
+    assert setup.status_code == 200
+    secret = setup.json()["secret"]
+    enabled = auth_client.post(
+        "/auth/totp/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+    backup_code = enabled.json()["backup_codes"][0]
+
+    assert enabled.status_code == 200
+    assert len(enabled.json()["backup_codes"]) == 10
+    assert auth_client.get("/admin/chain").status_code == 403
+    assert auth_client.get(
+        "/admin/chain",
+        headers={"X-TOTP-Code": pyotp.TOTP(secret).now()},
+    ).status_code == 200
+    assert auth_client.get(
+        "/admin/chain",
+        headers={"X-TOTP-Code": backup_code},
+    ).status_code == 200
+    assert auth_client.get(
+        "/admin/chain",
+        headers={"X-TOTP-Code": backup_code},
+    ).status_code == 403
+    step_up = auth_client.post(
+        "/auth/totp/verify",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+    assert step_up.status_code == 200
+    assert auth_client.get("/admin/chain").status_code == 200
+    mfa_cookie = next(
+        cookie for cookie in step_up.headers.get_list("set-cookie")
+        if "__Host-classswap_mfa=" in cookie
+    )
+    assert "httponly" in mfa_cookie.lower()
+    assert "max-age=300" in mfa_cookie.lower()
+
+
+def test_super_admin_can_force_logout_user_with_totp(
+    auth_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "totp_encryption_key",
+        Fernet.generate_key().decode("ascii"),
+    )
+    faculty_login = auth_client.post(
+        "/auth/login",
+        json={"email": "arjun.kulkarni@demo.edu", "password": "demo123"},
+    )
+    faculty_id = faculty_login.json()["id"]
+    faculty_token = auth_client.cookies.get(settings.auth_cookie_name)
+    assert faculty_login.status_code == 200 and faculty_token
+    auth_client.cookies.delete(settings.auth_cookie_name)
+
+    admin_login = auth_client.post(
+        "/auth/login",
+        json={"email": "principal.demo@demo.edu", "password": "demo123"},
+    )
+    assert admin_login.status_code == 200
+    setup = auth_client.post("/auth/totp/setup")
+    secret = setup.json()["secret"]
+    enabled = auth_client.post(
+        "/auth/totp/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+    assert enabled.status_code == 200
+
+    forced = auth_client.post(
+        f"/admin/users/{faculty_id}/force-logout",
+        headers={"X-TOTP-Code": pyotp.TOTP(secret).now()},
+    )
+    auth_client.cookies.delete(settings.auth_cookie_name)
+    auth_client.cookies.set(settings.auth_cookie_name, faculty_token)
+
+    assert forced.status_code == 204
+    assert auth_client.get("/me").status_code == 401
+
+
+def test_tokens_reject_none_and_non_hs256_algorithms() -> None:
+    now = int(datetime.now(timezone.utc).timestamp())
+    claims = {
+        "sub": "1",
+        "iat": now,
+        "exp": now + 300,
+        "jti": "test-token-id",
+        "ver": 0,
+        "abs_exp": now + 28_800,
+        "session_started": now,
+    }
+    none_token = jwt.encode(claims, key="", algorithm="none")
+    wrong_algorithm_token = jwt.encode(claims, key=settings.jwt_secret_key, algorithm="HS384")
+
+    assert decode_access_token(none_token) is None
+    assert decode_access_token(wrong_algorithm_token) is None
+
+
+@pytest.mark.parametrize(
+    "secret",
+    ["", "replace-this-local-development-key", "short"],
+)
+def test_production_settings_reject_unsafe_jwt_secret(secret: str) -> None:
+    with pytest.raises(ValueError, match="JWT_SECRET_KEY"):
+        Settings(
+            _env_file=None,
+            ENV="production",
+            JWT_SECRET_KEY=secret,
+            COOKIE_SECURE=True,
+        )
+
+
+def test_production_settings_require_reset_email_and_https_origin() -> None:
+    with pytest.raises(ValueError, match="SMTP_HOST"):
+        Settings(
+            _env_file=None,
+            ENV="production",
+            JWT_SECRET_KEY="sufficiently-long-random-production-key-value",
+            COOKIE_SECURE=True,
+            APP_BASE_URL="https://classswap.example",
+        )
 
 
 def test_role_guard_allows_admin_roles_and_rejects_faculty() -> None:

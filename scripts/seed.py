@@ -8,10 +8,11 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from alembic import command
 from alembic.config import Config
-from passlib.context import CryptContext
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
+from app.core.security import hash_password, password_context
 from app.database import Base, engine
 from app.models import (
     Absence,
@@ -28,7 +29,7 @@ from app.models import (
 
 
 SEED_DIR = PROJECT_ROOT / "seed"
-PASSWORD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
+PASSWORD_CONTEXT = password_context
 DAY_NUMBERS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5}
 COUNTED_MODELS = {
     "users": User,
@@ -59,10 +60,11 @@ def load_seed(session: Session, seed_dir: Path = SEED_DIR) -> dict[str, int]:
         user = User(
             name=row["name"],
             email=row["email"].strip().lower(),
-            password_hash=PASSWORD_CONTEXT.hash("demo123"),
+            password_hash=hash_password("demo123"),
             role=row["role"],
             department=row["department"],
             teaches=row["teaches"].strip().lower() == "true",
+            must_change_password=True,
         )
         session.add(user)
         session.flush()
@@ -139,12 +141,17 @@ def load_seed(session: Session, seed_dir: Path = SEED_DIR) -> dict[str, int]:
     for row in absence_rows:
         absent_date = date.fromisoformat(row["date"])
         day_number = absent_date.weekday()
-        timetable = timetable_by_slot.get((row["section"], day_number, int(row["period_no"])))
-        if timetable is None or timetable.subject_id != subject_ids[row["subject"]] \
-                or timetable.faculty_id != user_ids[row["faculty_email"].strip().lower()]:
+        existing_timetable = timetable_by_slot.get(
+            (row["section"], day_number, int(row["period_no"]))
+        )
+        if (
+            existing_timetable is None
+            or existing_timetable.subject_id != subject_ids[row["subject"]]
+            or existing_timetable.faculty_id != user_ids[row["faculty_email"].strip().lower()]
+        ):
             raise ValueError("Absence %s does not match the weekly timetable." % row["id"])
         absence = Absence(
-            timetable_id=timetable.id,
+            timetable_id=existing_timetable.id,
             faculty_id=user_ids[row["faculty_email"].strip().lower()],
             date=absent_date,
             period_no=int(row["period_no"]),
@@ -153,7 +160,7 @@ def load_seed(session: Session, seed_dir: Path = SEED_DIR) -> dict[str, int]:
         session.add(absence)
         session.flush()
         absence_ids[row["id"]] = absence.id
-        absence_timetables[row["id"]] = timetable
+        absence_timetables[row["id"]] = existing_timetable
 
     for row in read_csv(seed_dir, "substitutions.csv"):
         timetable = absence_timetables[row["absence_id"]]
@@ -179,6 +186,8 @@ def load_seed(session: Session, seed_dir: Path = SEED_DIR) -> dict[str, int]:
 
 
 def seed_database(database_engine: Engine | None = None, seed_dir: Path = SEED_DIR) -> dict[str, int]:
+    if settings.environment == "production":
+        raise RuntimeError("Demo seeding is disabled in production.")
     target_engine = database_engine or engine
     if database_engine is None:
         alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
